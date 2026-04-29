@@ -2,7 +2,7 @@
 
   <PropertyGroup>
 	  <OutputType>WinExe</OutputType>
-	  <TargetFramework>net8.0-windows10.0.22621.0</TargetFramework>
+	  <TargetFramework>net10.0-windows10.0.22621.0</TargetFramework>
 	  <Nullable>enable</Nullable>
 	  <UseWPF>true</UseWPF>
 	  <ApplicationIcon>Images\VisualHFT.ico</ApplicationIcon>
@@ -12,10 +12,7 @@
   </PropertyGroup>
 	<ItemGroup>
 		<AssemblyAttribute Include="System.Runtime.CompilerServices.InternalsVisibleTo">
-			<_Parameter1>VisualHFT.DataRetriever.TestingFramework</_Parameter1>
-		</AssemblyAttribute>
-		<AssemblyAttribute Include="System.Runtime.CompilerServices.InternalsVisibleTo">
-			<_Parameter1>VisualHFT.TriggerService.TestingFramework</_Parameter1>
+			<_Parameter1>VisualHFT.TriggerService.Tests</_Parameter1>
 		</AssemblyAttribute>
 	</ItemGroup>
   <ItemGroup>
@@ -29,6 +26,7 @@
     <Compile Remove="VisualHFT.MarketConnectors.Test\**" />
     <Compile Remove="VisualHFT.Plugins\**" />
     <Compile Remove="VisualHFT.TriggerService.TestingFramework\**" />
+    <Compile Remove="tests\**" />
     <EmbeddedResource Remove="demoTradingCore\**" />
     <EmbeddedResource Remove="packages\**" />
     <EmbeddedResource Remove="SDK-MarketConnectorTemplate\**" />
@@ -39,6 +37,7 @@
     <EmbeddedResource Remove="VisualHFT.MarketConnectors.Test\**" />
     <EmbeddedResource Remove="VisualHFT.Plugins\**" />
     <EmbeddedResource Remove="VisualHFT.TriggerService.TestingFramework\**" />
+    <EmbeddedResource Remove="tests\**" />
     <None Remove="demoTradingCore\**" />
     <None Remove="packages\**" />
     <None Remove="SDK-MarketConnectorTemplate\**" />
@@ -49,6 +48,7 @@
     <None Remove="VisualHFT.MarketConnectors.Test\**" />
     <None Remove="VisualHFT.Plugins\**" />
     <None Remove="VisualHFT.TriggerService.TestingFramework\**" />
+    <None Remove="tests\**" />
     <Page Remove="demoTradingCore\**" />
     <Page Remove="packages\**" />
     <Page Remove="SDK-MarketConnectorTemplate\**" />
@@ -59,6 +59,7 @@
     <Page Remove="VisualHFT.MarketConnectors.Test\**" />
     <Page Remove="VisualHFT.Plugins\**" />
     <Page Remove="VisualHFT.TriggerService.TestingFramework\**" />
+    <Page Remove="tests\**" />
   </ItemGroup>
 
   <ItemGroup>
@@ -90,6 +91,10 @@
     <None Remove="README.md.bak" />
     <None Remove="README.md.docx" />
     <None Remove="VisualHFT.csproj.bak" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <Compile Include="VisualHFT.Plugins\Studies.MarketResilience.Test\MarketResilienceWithBiasTests.cs" />
   </ItemGroup>
 
 	<ItemGroup>
@@ -135,8 +140,17 @@
     <Content Include="App.config">
       <CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
     </Content>
+    <None Include=".github\upgrades\scenarios\dotnet-version-upgrade\plan.md" />
     <None Include=".github\upgrades\scenarios\dotnet-version-upgrade\scenario-instructions.md" />
+    <None Include=".github\upgrades\scenarios\dotnet-version-upgrade\tasks.md" />
+    <None Include=".github\upgrades\scenarios\dotnet-version-upgrade\tasks\01-prerequisites\progress-details.md" />
+    <None Include=".github\upgrades\scenarios\dotnet-version-upgrade\tasks\02-tier1-foundation\progress-details.md" />
+    <None Include=".github\upgrades\scenarios\dotnet-version-upgrade\tasks\03-tier2-connectors-wpf\progress-details.md" />
+    <None Include=".github\upgrades\scenarios\dotnet-version-upgrade\tasks\04-tier3-apps\progress-details.md" />
+    <None Include=".github\upgrades\scenarios\dotnet-version-upgrade\tasks\05-tier4-main-app\progress-details.md" />
+    <None Include=".github\upgrades\scenarios\dotnet-version-upgrade\tasks\06-solution-validation\progress-details.md" />
     <None Include=".github\upgrades\scenarios\dotnet-version-upgrade\upgrade-options.md" />
+
     <Resource Include="Images\database.png">
       <CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
     </Resource>
