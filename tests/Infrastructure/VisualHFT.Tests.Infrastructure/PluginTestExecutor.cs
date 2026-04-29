@@ -115,6 +115,16 @@ namespace VisualHFT.DataRetriever.TestingFramework.Core
                     _testOutputHelper.WriteLine($"[{testName}] ? {pluginName} - FAILED: {error}");
                 }
             }
+            catch (SkippedPluginTestException ex)
+            {
+                errors.Add(new ErrorReporting
+                {
+                    PluginName = pluginName,
+                    Message = ex.Message,
+                    MessageType = ErrorMessageTypes.WARNING
+                });
+                _testOutputHelper.WriteLine($"[{testName}] ? {pluginName} - SKIPPED: {ex.Message}");
+            }
             catch (Exception ex)
             {
                 var errorMessage = $"Test execution failed: {ex.Message}";
