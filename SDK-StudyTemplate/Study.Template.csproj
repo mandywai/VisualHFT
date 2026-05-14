@@ -7,9 +7,9 @@
     additional packages for calculations and visualization.
   -->
   <PropertyGroup>
-    <!-- Target .NET 8 on Windows.  The UseWPF flag is required by
+    <!-- Target .NET 10 on Windows.  The UseWPF flag is required by
          VisualHFT for study plug‑ins that provide UI settings. -->
-    <TargetFramework>net8.0-windows10.0.17763.0</TargetFramework>
+    <TargetFramework>net10.0-windows10.0.17763.0</TargetFramework>
     <Nullable>enable</Nullable>
     <UseWPF>true</UseWPF>
     <SupportedOSPlatformVersion>10.0.17763.0</SupportedOSPlatformVersion>
@@ -18,7 +18,7 @@
 
   <ItemGroup>
     <!-- Common packages for study plugins -->
-    <PackageReference Include="log4net" Version="3.2.0" />
+    <PackageReference Include="log4net" Version="3.3.1" />
     <PackageReference Include="Newtonsoft.Json" Version="13.0.4" />
     <!-- Add additional packages as needed for your study calculations -->
     <!-- <PackageReference Include="MathNet.Numerics" Version="5.0.0" /> -->

@@ -23,19 +23,19 @@ namespace VisualHFT.Studies.Template.ViewModel
     {
         #region Private Fields
         
-        private PlugInSettings _settings;
-        private string _selectedSymbol;
-        private VisualHFT.ViewModel.Model.Provider _selectedProvider;
+        private PlugInSettings _settings = new PlugInSettings();
+        private string _selectedSymbol = string.Empty;
+        private VisualHFT.ViewModel.Model.Provider? _selectedProvider;
         private AggregationLevel _aggregationLevelSelection;
-        private string _validationMessage;
+        private string _validationMessage = string.Empty;
         private int _timePeriodMs;
         private double _minVolumeThreshold;
         private double _alertThreshold;
         private bool _enableAlerts;
         private double _customParameter1;
         private int _customParameter2;
-        
-        public Action UpdateSettingsFromUI { get; set; }
+
+        public Action? UpdateSettingsFromUI { get; set; }
         
         #endregion
 
@@ -62,7 +62,7 @@ namespace VisualHFT.Studies.Template.ViewModel
             }
         }
 
-        public VisualHFT.ViewModel.Model.Provider SelectedProvider
+        public VisualHFT.ViewModel.Model.Provider? SelectedProvider
         {
             get => _selectedProvider;
             set
@@ -306,7 +306,8 @@ namespace VisualHFT.Studies.Template.ViewModel
         {
             // Save settings
             Settings.Symbol = SelectedSymbol;
-            Settings.Provider = SelectedProvider;
+            if (SelectedProvider != null)
+                Settings.Provider = SelectedProvider;
             Settings.AggregationLevel = AggregationLevelSelection;
             
             // Close the window

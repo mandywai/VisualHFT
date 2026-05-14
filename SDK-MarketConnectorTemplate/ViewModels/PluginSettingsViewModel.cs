@@ -7,312 +7,144 @@ using VisualHFT.Helpers;
 
 namespace MarketConnector.Template.ViewModels
 {
-    /// <summary>
-    /// ViewModel for the plugin settings window. Handles validation, commands,
-    /// and data binding between the settings view and the settings model.
-    /// </summary>
+    // Settings UI ViewModel. Mirrors the pattern used by the canonical Binance /
+    // Bitfinex / Kraken plug-ins: each editable field is a property on the VM,
+    // an UpdateSettingsFromUI callback hands the edited values back to the
+    // owning plug-in, and the OK / Cancel commands drive the surrounding window.
     public class PluginSettingsViewModel : INotifyPropertyChanged, IDataErrorInfo
     {
-        private readonly Model.PlugInSettings _settings;
-        private string _validationMessage;
-        private string _successMessage;
-        private readonly Action _closeWindow;
+        private string _apiKey = string.Empty;
+        private string _apiSecret = string.Empty;
+        private int _depthLevels;
+        private int _providerId;
+        private string _providerName = string.Empty;
+        private List<string> _symbols = new List<string>();
+        private string _validationMessage = string.Empty;
+        private string _successMessage = string.Empty;
+        private readonly Action? _closeWindow;
 
-        public ICommand OkCommand { get; private set; }
-        public ICommand CancelCommand { get; private set; }
-        public ICommand TestConnectionCommand { get; private set; }
+        public ICommand OkCommand { get; }
+        public ICommand CancelCommand { get; }
 
-        /// <summary>
-        /// Gets or sets the API key for the exchange.
-        /// </summary>
+        // Owner plug-in sets this to apply the edited values to its settings
+        // model. Invoked when the user clicks OK.
+        public Action? UpdateSettingsFromUI { get; set; }
+
+        public PluginSettingsViewModel(Action? closeWindow)
+        {
+            _closeWindow = closeWindow;
+            OkCommand = new RelayCommand<object>(ExecuteOk, CanExecuteOk);
+            CancelCommand = new RelayCommand<object>(ExecuteCancel);
+        }
+
         public string ApiKey
         {
-            get => _settings.ApiKey;
-            set
-            {
-                if (_settings.ApiKey != value)
-                {
-                    _settings.ApiKey = value;
-                    OnPropertyChanged(nameof(ApiKey));
-                }
-            }
+            get => _apiKey;
+            set { _apiKey = value; OnPropertyChanged(nameof(ApiKey)); }
         }
 
-        /// <summary>
-        /// Gets or sets the API secret for the exchange.
-        /// </summary>
         public string ApiSecret
         {
-            get => _settings.ApiSecret;
-            set
-            {
-                if (_settings.ApiSecret != value)
-                {
-                    _settings.ApiSecret = value;
-                    OnPropertyChanged(nameof(ApiSecret));
-                }
-            }
+            get => _apiSecret;
+            set { _apiSecret = value; OnPropertyChanged(nameof(ApiSecret)); }
         }
 
-        /// <summary>
-        /// Gets or sets the comma-separated list of symbols to subscribe to.
-        /// </summary>
-        public string Symbols
-        {
-            get => _settings.Symbols;
-            set
-            {
-                if (_settings.Symbols != value)
-                {
-                    _settings.Symbols = value;
-                    OnPropertyChanged(nameof(Symbols));
-                }
-            }
-        }
-
-        /// <summary>
-        /// Gets or sets the number of depth levels for the order book.
-        /// </summary>
         public int DepthLevels
         {
-            get => _settings.DepthLevels;
-            set
-            {
-                if (_settings.DepthLevels != value)
-                {
-                    _settings.DepthLevels = value;
-                    OnPropertyChanged(nameof(DepthLevels));
-                }
-            }
+            get => _depthLevels;
+            set { _depthLevels = value; OnPropertyChanged(nameof(DepthLevels)); }
         }
 
-        /// <summary>
-        /// Gets or sets the aggregation level in milliseconds.
-        /// </summary>
-        public int AggregationLevel
+        public int ProviderId
         {
-            get => (int)_settings.AggregationLevel;
+            get => _providerId;
+            set { _providerId = value; OnPropertyChanged(nameof(ProviderId)); }
+        }
+
+        public string ProviderName
+        {
+            get => _providerName;
+            set { _providerName = value; OnPropertyChanged(nameof(ProviderName)); }
+        }
+
+        public List<string> Symbols
+        {
+            get => _symbols;
             set
             {
-                if ((int)_settings.AggregationLevel != value)
-                {
-                    _settings.AggregationLevel = (VisualHFT.Enums.AggregationLevel)value;
-                    OnPropertyChanged(nameof(AggregationLevel));
-                }
+                _symbols = value ?? new List<string>();
+                OnPropertyChanged(nameof(Symbols));
+                OnPropertyChanged(nameof(SymbolsText));
             }
         }
 
-        /// <summary>
-        /// Gets or sets validation messages to display to the user.
-        /// </summary>
+        // Comma-joined textbox-friendly view over Symbols. Bound to a single
+        // TextBox in the XAML so the user can edit the whole list as text.
+        public string SymbolsText
+        {
+            get => string.Join(",", _symbols);
+            set
+            {
+                _symbols = (value ?? string.Empty)
+                    .Split(',', StringSplitOptions.RemoveEmptyEntries)
+                    .Select(s => s.Trim())
+                    .Where(s => s.Length > 0)
+                    .ToList();
+                OnPropertyChanged(nameof(SymbolsText));
+                OnPropertyChanged(nameof(Symbols));
+            }
+        }
+
         public string ValidationMessage
         {
             get => _validationMessage;
-            set
-            {
-                if (_validationMessage != value)
-                {
-                    _validationMessage = value;
-                    OnPropertyChanged(nameof(ValidationMessage));
-                }
-            }
+            set { _validationMessage = value; OnPropertyChanged(nameof(ValidationMessage)); }
         }
 
-        /// <summary>
-        /// Gets or sets success messages to display to the user.
-        /// </summary>
         public string SuccessMessage
         {
             get => _successMessage;
-            set
-            {
-                if (_successMessage != value)
-                {
-                    _successMessage = value;
-                    OnPropertyChanged(nameof(SuccessMessage));
-                }
-            }
+            set { _successMessage = value; OnPropertyChanged(nameof(SuccessMessage)); }
         }
 
-        public PluginSettingsViewModel(Model.PlugInSettings settings, Action closeWindow)
+        // ---- IDataErrorInfo ------------------------------------------------
+        public string Error => string.Empty;
+
+        public string this[string columnName] => columnName switch
         {
-            _settings = settings ?? throw new ArgumentNullException(nameof(settings));
-            _closeWindow = closeWindow ?? throw new ArgumentNullException(nameof(closeWindow));
+            nameof(SymbolsText) when _symbols.Count == 0
+                => "At least one symbol is required.",
+            nameof(DepthLevels) when DepthLevels <= 0
+                => "Depth levels must be greater than zero.",
+            nameof(ProviderId) when ProviderId <= 0
+                => "Provider ID must be a positive integer.",
+            nameof(ProviderName) when string.IsNullOrWhiteSpace(ProviderName)
+                => "Provider name cannot be empty.",
+            _ => string.Empty
+        };
 
-            // Initialize commands
-            OkCommand = new RelayCommand<object>(ExecuteOkCommand, CanExecuteOkCommand);
-            CancelCommand = new RelayCommand<object>(ExecuteCancelCommand);
-            TestConnectionCommand = new RelayCommand<object>(ExecuteTestConnectionCommand, CanExecuteTestConnectionCommand);
-        }
+        private bool CanExecuteOk(object _)
+            => string.IsNullOrEmpty(this[nameof(SymbolsText)])
+            && string.IsNullOrEmpty(this[nameof(DepthLevels)])
+            && string.IsNullOrEmpty(this[nameof(ProviderId)])
+            && string.IsNullOrEmpty(this[nameof(ProviderName)]);
 
-        #region Command Implementations
-
-        private bool CanExecuteOkCommand(object obj)
+        private void ExecuteOk(object _)
         {
-            // Enable OK button if there are no validation errors
-            return string.IsNullOrEmpty(this[nameof(ApiKey)]) &&
-                   string.IsNullOrEmpty(this[nameof(ApiSecret)]) &&
-                   string.IsNullOrEmpty(this[nameof(Symbols)]) &&
-                   string.IsNullOrEmpty(this[nameof(DepthLevels)]) &&
-                   string.IsNullOrEmpty(this[nameof(AggregationLevel)]);
-        }
-
-        private void ExecuteOkCommand(object obj)
-        {
-            // Save settings and close window
-            ValidationMessage = string.Empty;
-            SuccessMessage = "Settings saved successfully!";
-            
-            // TODO: Add any additional validation or processing here
-            
+            SuccessMessage = "Settings saved.";
+            UpdateSettingsFromUI?.Invoke();
             _closeWindow?.Invoke();
         }
 
-        private void ExecuteCancelCommand(object obj)
-        {
-            // Close window without saving
-            ValidationMessage = string.Empty;
-            SuccessMessage = string.Empty;
-            _closeWindow?.Invoke();
-        }
+        private void ExecuteCancel(object _) => _closeWindow?.Invoke();
 
-        private bool CanExecuteTestConnectionCommand(object obj)
-        {
-            // Enable test connection if API credentials are provided
-            return !string.IsNullOrWhiteSpace(ApiKey) && !string.IsNullOrWhiteSpace(ApiSecret);
-        }
-
-        private void ExecuteTestConnectionCommand(object obj)
-        {
-            try
-            {
-                ValidationMessage = string.Empty;
-                SuccessMessage = "Testing connection...";
-
-                // TODO: Implement actual connection test logic here
-                // Example:
-                // var client = new TemplateExchangeClient(ApiKey, ApiSecret);
-                // var isConnected = await client.TestConnectionAsync();
-                // 
-                // if (isConnected)
-                // {
-                //     SuccessMessage = "Connection successful!";
-                // }
-                // else
-                // {
-                //     ValidationMessage = "Connection failed. Please check your credentials.";
-                // }
-
-                // For now, simulate a test
-                System.Threading.Tasks.Task.Delay(1000).ContinueWith(t =>
-                {
-                    if (string.IsNullOrWhiteSpace(ApiKey) || string.IsNullOrWhiteSpace(ApiSecret))
-                    {
-                        ValidationMessage = "Please provide valid API credentials.";
-                        SuccessMessage = string.Empty;
-                    }
-                    else
-                    {
-                        SuccessMessage = "Connection test successful! (Mock)";
-                    }
-                }, System.Threading.Tasks.TaskScheduler.FromCurrentSynchronizationContext());
-            }
-            catch (Exception ex)
-            {
-                ValidationMessage = $"Connection test failed: {ex.Message}";
-                SuccessMessage = string.Empty;
-            }
-        }
-
-        #endregion
-
-        #region IDataErrorInfo Implementation
-
-        public string Error => null;
-
-        public string this[string columnName]
-        {
-            get
-            {
-                string result = null;
-
-                switch (columnName)
-                {
-                    case nameof(ApiKey):
-                        if (string.IsNullOrWhiteSpace(ApiKey))
-                        {
-                            result = "API Key is required when using authenticated endpoints.";
-                        }
-                        break;
-
-                    case nameof(ApiSecret):
-                        if (string.IsNullOrWhiteSpace(ApiSecret))
-                        {
-                            result = "API Secret is required when using authenticated endpoints.";
-                        }
-                        break;
-
-                    case nameof(Symbols):
-                        if (string.IsNullOrWhiteSpace(Symbols))
-                        {
-                            result = "At least one symbol is required.";
-                        }
-                        else
-                        {
-                            // Validate symbol format
-                            var symbols = Symbols.Split(',', StringSplitOptions.RemoveEmptyEntries);
-                            if (symbols.Length == 0)
-                            {
-                                result = "Invalid symbol format. Use comma-separated symbols (e.g., BTC-USD,ETH-USD).";
-                            }
-                        }
-                        break;
-
-                    case nameof(DepthLevels):
-                        if (DepthLevels <= 0)
-                        {
-                            result = "Depth levels must be greater than 0.";
-                        }
-                        else if (DepthLevels > 1000)
-                        {
-                            result = "Depth levels cannot exceed 1000.";
-                        }
-                        break;
-
-                    case nameof(AggregationLevel):
-                        if (AggregationLevel < 0)
-                        {
-                            result = "Aggregation level cannot be negative.";
-                        }
-                        else if (AggregationLevel > 60000)
-                        {
-                            result = "Aggregation level cannot exceed 60000 ms (60 seconds).";
-                        }
-                        break;
-                }
-
-                return result;
-            }
-        }
-
-        #endregion
-
-        #region INotifyPropertyChanged Implementation
-
-        public event PropertyChangedEventHandler PropertyChanged;
+        // ---- INotifyPropertyChanged ---------------------------------------
+        public event PropertyChangedEventHandler? PropertyChanged;
 
         protected virtual void OnPropertyChanged(string propertyName)
         {
             PropertyChanged?.Invoke(this, new PropertyChangedEventArgs(propertyName));
-            
-            // Re-evaluate command states when properties change
-            if (propertyName != nameof(ValidationMessage) && propertyName != nameof(SuccessMessage))
-            {
-                ((RelayCommand<object>)OkCommand).RaiseCanExecuteChanged();
-                ((RelayCommand<object>)TestConnectionCommand).RaiseCanExecuteChanged();
-            }
+            (OkCommand as RelayCommand<object>)?.RaiseCanExecuteChanged();
         }
-
-        #endregion
     }
 }

@@ -13,12 +13,12 @@ namespace VisualHFT.Studies.Template.Model
         /// <summary>
         /// The trading symbol to analyze (e.g., "BTC/USD", "EUR/USD")
         /// </summary>
-        public string Symbol { get; set; }
-        
+        public string Symbol { get; set; } = string.Empty;
+
         /// <summary>
         /// The data provider to use for market data
         /// </summary>
-        public Provider Provider { get; set; }
+        public Provider Provider { get; set; } = new Provider();
         
         /// <summary>
         /// The aggregation level for data processing

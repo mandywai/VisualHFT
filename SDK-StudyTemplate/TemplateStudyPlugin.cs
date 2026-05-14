@@ -24,7 +24,7 @@ namespace VisualHFT.Studies.Template
         #region Private Fields
         
         private new bool _disposed = false; // to track whether the object has been disposed
-        private PlugInSettings _settings;
+        private PlugInSettings _settings = new PlugInSettings();
         
         // Study-specific data
         private double _calculatedValue = 0;
@@ -103,16 +103,20 @@ namespace VisualHFT.Studies.Template
                 "This template demonstrates how to create study plugins that analyze market conditions.<br/>" +
                 "Override the calculation methods to implement your specific analysis logic.";
 
-        public override Action CloseSettingWindow { get; set; }
+        public override Action CloseSettingWindow { get; set; } = () => { };
 
-        public override event EventHandler<decimal> OnAlertTriggered;
+        public override event EventHandler<decimal>? OnAlertTriggered;
 
         protected override void LoadSettings()
         {
-            _settings = LoadFromUserSettings<PlugInSettings>();
-            if (_settings == null)
+            var loaded = LoadFromUserSettings<PlugInSettings>();
+            if (loaded == null)
             {
                 InitializeDefaultSettings();
+            }
+            else
+            {
+                _settings = loaded;
             }
             if (_settings.Provider == null) //To prevent back compability with older setting formats
             {
@@ -162,8 +166,7 @@ namespace VisualHFT.Studies.Template
             // Process the order book snapshot
             // TODO: Implement your study calculation logic here
             // Example: Calculate a simple spread
-            if (snapshot.Bids != null && snapshot.Bids.Length > 0 && 
-                snapshot.Asks != null && snapshot.Asks.Length > 0)
+            if (snapshot.Bids.Length > 0 && snapshot.Asks.Length > 0)
             {
                 var bestBid = snapshot.Bids[0];
                 var bestAsk = snapshot.Asks[0];
@@ -268,7 +271,8 @@ namespace VisualHFT.Studies.Template
             viewModel.UpdateSettingsFromUI = () =>
             {
                 _settings.Symbol = viewModel.SelectedSymbol;
-                _settings.Provider = viewModel.SelectedProvider;
+                if (viewModel.SelectedProvider != null)
+                    _settings.Provider = viewModel.SelectedProvider;
                 _settings.AggregationLevel = viewModel.AggregationLevelSelection;
                 _settings.TimePeriodMs = viewModel.TimePeriodMs;
                 _settings.MinVolumeThreshold = viewModel.MinVolumeThreshold;
