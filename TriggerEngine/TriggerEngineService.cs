@@ -22,10 +22,13 @@ namespace VisualHFT.TriggerEngine
     /// </summary>
     public static class TriggerEngineService
     {
-        public static string TriggerEngineConfigFileName="TriggerEngineConfig.json";
-        public static string TriggerEngineConfigFilePath  = Path.Combine(Environment.GetFolderPath(Environment.SpecialFolder.LocalApplicationData), "VisualHFT",
-            TriggerEngineConfigFileName); 
-         
+        private static readonly log4net.ILog log =
+            log4net.LogManager.GetLogger(typeof(TriggerEngineService));
+
+        public static string TriggerEngineConfigFileName = "TriggerEngineConfig.json";
+        public static string TriggerEngineConfigFilePath = Path.Combine(Environment.GetFolderPath(Environment.SpecialFolder.LocalApplicationData), "VisualHFT",
+            TriggerEngineConfigFileName);
+
         private static readonly List<TriggerRule> lstRule = new();
         private static readonly object ruleLock = new();
 
@@ -34,7 +37,16 @@ namespace VisualHFT.TriggerEngine
         private static readonly ConcurrentDictionary<string, DateTime> ActionLastFiredTimes = new();
 
         private static readonly Channel<MetricEvent> MetricChannel = Channel.CreateUnbounded<MetricEvent>();
-         
+
+        // Architecture §2.2.5 — additive fan-in event consumed by the
+        // MarketDataRecorder TriggerCallbackHandler (T-MDR-046) and any other
+        // subscriber that needs to react to rule fires. Per ADR-03 this is
+        // purely additive: zero behavioural change for non-subscribers. The
+        // raise site lives at the bottom of ProcessMetric (after a fire passes
+        // the cooldown gate). Subscribers are invoked individually so a
+        // throwing handler never breaks others (T-MDR-045 case 7).
+        public static event Action<TriggerFiredEventArgs>? OnTriggerFired;
+
 
         /// <summary>   
         /// Registers a new incoming metric value from any plugin.
@@ -51,7 +63,7 @@ namespace VisualHFT.TriggerEngine
             // 3. Evaluate each rule
             // 4. If condition is met, execute all associated actions 
 
-            _ = MetricChannel.Writer.WriteAsync(new MetricEvent(pluginID, pluginName,exchange,symbol, value, timestamp));
+            _ = MetricChannel.Writer.WriteAsync(new MetricEvent(pluginID, pluginName, exchange, symbol, value, timestamp));
         }
 
         public static void AddOrUpdateRule(TriggerRule rule)
@@ -67,9 +79,9 @@ namespace VisualHFT.TriggerEngine
                 {
                     Directory.CreateDirectory(directoryPath);
                 }
-                string json= JsonConvert.SerializeObject(lstRule, Formatting.Indented);
+                string json = JsonConvert.SerializeObject(lstRule, Formatting.Indented);
                 File.WriteAllText(TriggerEngineConfigFilePath, json);
-               
+
             }
             LoadAllRules();
             Task.Run(() => EvaluateAllRulesAgainstLatestMetrics());
@@ -85,17 +97,17 @@ namespace VisualHFT.TriggerEngine
                     lstRule.Remove(rule);
                     string json = JsonConvert.SerializeObject(lstRule, Formatting.Indented);
                     File.WriteAllText(TriggerEngineConfigFilePath, json);
-                   
+
                 }
             }
             LoadAllRules();
             Task.Run(() => EvaluateAllRulesAgainstLatestMetrics());
-        } 
+        }
         public static void ClearAllRules()
         {
             lock (ruleLock)
             {
-                lstRule.Clear(); 
+                lstRule.Clear();
             }
         }
         public static List<TriggerRule> GetRules()
@@ -115,7 +127,7 @@ namespace VisualHFT.TriggerEngine
                     rule.IsEnabled = false;
 
                 }
-            } 
+            }
         }
         public static void StartRule(string name)
         {
@@ -138,10 +150,10 @@ namespace VisualHFT.TriggerEngine
 
             string ruleJSON = File.ReadAllText(filePath);
 
-           var rules=JsonConvert.DeserializeObject<List<TriggerRule>>(ruleJSON);
+            var rules = JsonConvert.DeserializeObject<List<TriggerRule>>(ruleJSON);
             lstRule.AddRange(rules);
         }
-         public static async Task StartBackgroundWorkerAsync(CancellationToken token)
+        public static async Task StartBackgroundWorkerAsync(CancellationToken token)
         {
             while (await MetricChannel.Reader.WaitToReadAsync(token))
             {
@@ -185,7 +197,7 @@ namespace VisualHFT.TriggerEngine
                         {
                             // First time, no previous firing. Fire immediately.
                             ActionLastFiredTimes[actionKey] = e.Timestamp;
-                            
+
                             //TODO: uncomment if we need to fire immediately if there is no previous firing
                             //_ = ExecuteActionAsync(rule.Name, condition, action, e.Plugin, e.Metric, e.Value, e.Timestamp);
                         }
@@ -195,11 +207,54 @@ namespace VisualHFT.TriggerEngine
                             {
                                 // Cooldown passed, fire again
                                 ActionLastFiredTimes[actionKey] = e.Timestamp;
-                                _ = ExecuteActionAsync(rule.Name, condition, action, e.Plugin, e.Metric, e.Exchange,e.Symbol, e.Value, e.Timestamp);
+                                _ = ExecuteActionAsync(rule.Name, condition, action, e.Plugin, e.Metric, e.Exchange, e.Symbol, e.Value, e.Timestamp);
+
+                                // Architecture §2.2.5 — raise OnTriggerFired
+                                // AFTER the cooldown passes (matches the fire
+                                // semantics of ExecuteActionAsync). Per-handler
+                                // try/catch keeps a misbehaving subscriber from
+                                // poisoning the rest of the invocation list
+                                // (T-MDR-045 case 7).
+                                RaiseOnTriggerFired(rule, condition, e);
                             }
                             // else: cooldown not passed, do nothing
                         }
                     }
+                }
+            }
+        }
+
+        // Per-subscriber fan-out for OnTriggerFired. Iterating GetInvocationList
+        // is required so a throwing subscriber does not abort the multicast — the
+        // default `event(args)` form short-circuits on the first thrown exception
+        // (Architecture §2.2.5 / T-MDR-045 case 7).
+        private static void RaiseOnTriggerFired(TriggerRule rule, TriggerCondition condition, MetricEvent e)
+        {
+            var snapshot = OnTriggerFired;
+            if (snapshot is null) return;
+
+            var args = new TriggerFiredEventArgs(
+                RuleID: rule.RuleID,
+                RuleName: rule.Name,
+                Plugin: condition.Plugin,
+                Metric: condition.Metric,
+                Exchange: e.Exchange,
+                Symbol: e.Symbol,
+                Value: e.Value,
+                Threshold: condition.Threshold,
+                Operator: condition.Operator,
+                Timestamp: e.Timestamp);
+
+            var handlers = snapshot.GetInvocationList();
+            for (int i = 0; i < handlers.Length; i++)
+            {
+                try
+                {
+                    ((Action<TriggerFiredEventArgs>)handlers[i])(args);
+                }
+                catch (Exception ex)
+                {
+                    log.Warn("OnTriggerFired subscriber threw an exception", ex);
                 }
             }
         }
@@ -260,7 +315,7 @@ namespace VisualHFT.TriggerEngine
             };
         }
 
-        private static Task ExecuteActionAsync(string ruleName, TriggerCondition condition, TriggerAction action, string plugin, string metric,string exchange, string symbol, double value, DateTime timestamp)
+        private static Task ExecuteActionAsync(string ruleName, TriggerCondition condition, TriggerAction action, string plugin, string metric, string exchange, string symbol, double value, DateTime timestamp)
         {
             if (action.Type == ActionType.RestApi && action.RestApi != null)
             {
@@ -271,22 +326,22 @@ namespace VisualHFT.TriggerEngine
                     .Replace("{{threshold}}", condition.Threshold.ToString())
                     .Replace("{{value}}", value.ToString())
                     .Replace("{{timestamp}}", timestamp.ToString("o"));
-                    
+
                 _ = action.RestApi.ExecuteAsync(body); // Fire and forget
 
-            } 
-            
+            }
+
             if (action.Type == ActionType.UIAlert)
             {
                 string formattedMessage = $"{metric} - {exchange} - {symbol}: \"{condition.Operator.ToString()} {condition.Threshold} \" has been triggered ";
-                HelperNotificationManager.Instance.AddNotification("Alert",formattedMessage, HelprNorificationManagerTypes.TRIGGER_ACTION, 
-                    HelprNorificationManagerCategories.TRIGGER_ENGINE,null,condition.Plugin);
+                HelperNotificationManager.Instance.AddNotification("Alert", formattedMessage, HelprNorificationManagerTypes.TRIGGER_ACTION,
+                    HelprNorificationManagerCategories.TRIGGER_ENGINE, null, condition.Plugin);
             }
             return Task.CompletedTask;
-        } 
+        }
 
-            private static void EvaluateAllRulesAgainstLatestMetrics()
-        { 
+        private static void EvaluateAllRulesAgainstLatestMetrics()
+        {
             Task.Run(() =>
             {
                 var latestMetrics = LastMetricValues.ToArray(); // Snapshot current metrics
@@ -303,7 +358,7 @@ namespace VisualHFT.TriggerEngine
                     var symbol = parts[3];
                     var value = kvp.Value;
 
-                    var metricEvent = new MetricEvent(plugin, metric, exchange,symbol, value, DateTime.UtcNow);
+                    var metricEvent = new MetricEvent(plugin, metric, exchange, symbol, value, DateTime.UtcNow);
                     _ = MetricChannel.Writer.WriteAsync(metricEvent);
                 }
             });

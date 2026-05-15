@@ -1,9 +1,4 @@
-﻿using System;
-using System.Collections.Generic;
-using System.ComponentModel;
-using System.Linq;
-using System.Text;
-using System.Threading.Tasks;
+﻿using System.ComponentModel;
 
 namespace VisualHFT.TriggerEngine
 {
@@ -15,6 +10,7 @@ namespace VisualHFT.TriggerEngine
         CrossesAbove,
         CrossesBelow
     }
+
     public enum TimeWindowUnit
     {
         Seconds,
@@ -24,7 +20,7 @@ namespace VisualHFT.TriggerEngine
         Hours,
         Days
     }
-    
+
     public enum ActionType
     {
         [Description("Notify In-App")]
@@ -34,11 +30,11 @@ namespace VisualHFT.TriggerEngine
         RestApi
         // Future: UI, LogFile, PluginCallback, Webhook, StrategyControl, etc.
     }
+
     public enum AlertSeverity
     {
         Info,
         Warning,
         Error
     }
-    
 }
