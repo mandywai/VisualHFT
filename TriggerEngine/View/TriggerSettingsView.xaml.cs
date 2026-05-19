@@ -1,18 +1,8 @@
 ﻿using System;
 using System.Collections.Generic;
 using System.ComponentModel;
-using System.Linq;
-using System.Reactive.Linq;
-using System.Text;
-using System.Threading.Tasks;
 using System.Windows;
 using System.Windows.Controls;
-using System.Windows.Data;
-using System.Windows.Documents;
-using System.Windows.Input;
-using System.Windows.Media;
-using System.Windows.Media.Imaging;
-using System.Windows.Shapes;
 using VisualHFT.TriggerEngine.ViewModel;
 using VisualHFT.ViewModel;
 
@@ -29,7 +19,7 @@ namespace VisualHFT.TriggerEngine.View
         {
             InitializeComponent();
 
-            
+
 
             this.dashboard= _dashboard;
 
@@ -65,9 +55,9 @@ namespace VisualHFT.TriggerEngine.View
                 vm.Condition = new BindingList<TriggerConditionViewModel>();
                 vm.Actions = new BindingList<TriggerActionViewModel>();
                 vm.IsEnabled = x.IsEnabled;
-                vm.RuleID = x.RuleID; 
+                vm.RuleID = x.RuleID;
 
-                x.Condition.ForEach(y =>
+                x.Condition?.ForEach(y =>
                 {
                     TriggerConditionViewModel vmCondition = new TriggerConditionViewModel();
                     vmCondition.Plugin = y.Plugin;
@@ -75,17 +65,17 @@ namespace VisualHFT.TriggerEngine.View
                     vmCondition.Operator = y.Operator;
                     vmCondition.Threshold = y.Threshold;
                     vmCondition.Window = y.Window;
-                    vmCondition.ConditionID= y.ConditionID;
+                    vmCondition.ConditionID = y.ConditionID;
                     vm.Condition.Add(vmCondition);
                 });
-                x.Actions.ForEach(x =>
+                x.Actions?.ForEach(x =>
                 {
                     TriggerActionViewModel vmAction = new TriggerActionViewModel();
                     vmAction.Type = x.Type;
                     vmAction.CooldownDuration = x.CooldownDuration;
                     vmAction.CooldownUnit = x.CooldownUnit;
                     vmAction.ActionID = x.ActionID;
-                    if (x.Type==ActionType.RestApi && x.RestApi != null)
+                    if (x.Type == ActionType.RestApi && x.RestApi != null)
                     {
                         vmAction.RestApi = new RestApiActionViewModel();
                         vmAction.RestApi.Url = x.RestApi.Url;
@@ -137,8 +127,8 @@ namespace VisualHFT.TriggerEngine.View
 
         private void StartRule(object sender, RoutedEventArgs e)
         {
-           
-                Button hyperlink = (Button)sender;
+
+            Button hyperlink = (Button)sender;
             TriggerEngineRuleViewModel selectedRule = (TriggerEngineRuleViewModel)hyperlink.DataContext;
             MessageBoxResult result = MessageBox.Show($"Are you sure you want to start the rule '{selectedRule.Name}'?", "Confirm", MessageBoxButton.YesNo, MessageBoxImage.Warning);
             if (result == MessageBoxResult.Yes)
