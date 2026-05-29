@@ -114,6 +114,9 @@ namespace VisualHFT.Studies
         // Event declaration
         public override event EventHandler<decimal> OnAlertTriggered;
 
+        // Emits a metric via AddCalculation -> the trigger picker lists this study (IStudy.EmitsMetric).
+        public override bool EmitsMetric => true;
+
         public override string Name { get; set; } = "Order To Trade Ratio Study Plugin";
         public override string Version { get; set; } = "1.0.0";
         public override string Description { get; set; } = "Order-to-Trade Ratio measures order book activity vs executed public trades. Regulatory metric for detecting potential market manipulation.";

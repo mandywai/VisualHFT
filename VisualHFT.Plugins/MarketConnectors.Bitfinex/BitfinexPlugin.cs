@@ -773,7 +773,7 @@ namespace MarketConnectors.Bitfinex
                 ApiSecret = "",
                 DepthLevels = 25,
                 Provider = new VisualHFT.Model.Provider() { ProviderID = 2, ProviderName = "Bitfinex" },
-                Symbols = new List<string>() { "BTCUSD(BTC/USD)", "ETHUSD(ETH/USD)" } // Add more symbols as needed
+                Symbols = new List<string>() { "tBTCUSD(BTC/USD)", "tETHUSD(ETH/USD)" } // Add more symbols as needed
             };
             SaveToUserSettings(_settings);
         }

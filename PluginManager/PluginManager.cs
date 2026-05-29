@@ -74,6 +74,9 @@ namespace VisualHFT.PluginManager
                         {
                             if (child == null)
                                 continue;
+                            // Only metric-emitting children are matchable by a trigger rule.
+                            if (!child.EmitsMetric)
+                                continue;
                             result.Add(new StudyDescriptor
                             {
                                 // Key carries the metric identity (TileTitle), so children stay
@@ -90,6 +93,9 @@ namespace VisualHFT.PluginManager
                     }
                     else if (plugin is IStudy study)
                     {
+                        // Only metric-emitting studies are matchable by a trigger rule.
+                        if (!study.EmitsMetric)
+                            continue;
                         var settings = plugin.Settings;
                         var reason = settings is null ? "Plugin has no settings." : settings.GetConfigurationError();
                         result.Add(new StudyDescriptor

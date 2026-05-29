@@ -27,6 +27,9 @@ namespace VisualHFT.Studies
         // Event declaration
         public override event EventHandler<decimal> OnAlertTriggered;
 
+        // Emits a metric via AddCalculation -> the trigger picker lists this study (IStudy.EmitsMetric).
+        public override bool EmitsMetric => true;
+
         public override string Name { get; set; } = "Market Resilience Bias";
         public override string Version { get; set; } = "1.0.0";
         public override string Description { get; set; } = "Analyzes directional market sentiment after large trades by monitoring volume addition rates on bid/ask sides. Provides real-time bias scoring (+1 bullish, -1 bearish, 0 neutral) for sentiment analysis.";
