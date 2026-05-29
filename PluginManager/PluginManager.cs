@@ -44,6 +44,69 @@ namespace VisualHFT.PluginManager
             }
         }
         public static List<IPlugin> AllPlugins { get { lock (_locker) return ALL_PLUGINS; } }
+
+        /// <summary>
+        /// Curated, flattened list of selectable study-metrics for any "pick a study"
+        /// surface. Single studies map to one descriptor; multi-study children map to one
+        /// each (grouped under the parent's title). Multi-study parents are never selectable
+        /// on their own. Non-study plugins (data retrievers, etc.) are excluded.
+        /// Read-only: building this list does not start or wire any plugin.
+        /// </summary>
+        public static IReadOnlyList<StudyDescriptor> GetSelectableStudies()
+        {
+            var result = new List<StudyDescriptor>();
+            lock (_locker)
+            {
+                foreach (var plugin in ALL_PLUGINS)
+                {
+                    // Multi-study parents are IPlugin + IMultiStudy (not IStudy): emit children only.
+                    if (plugin is IMultiStudy multi)
+                    {
+                        var parentId = plugin.GetPluginUniqueID();
+                        var settings = plugin.Settings;
+                        // Children share the parent's settings, so the config state (and its
+                        // reason) is computed once and applied to every child.
+                        var reason = settings is null ? "Plugin has no settings." : settings.GetConfigurationError();
+                        var children = multi.Studies;
+                        if (children == null)
+                            continue;
+                        foreach (var child in children)
+                        {
+                            if (child == null)
+                                continue;
+                            result.Add(new StudyDescriptor
+                            {
+                                // Key carries the metric identity (TileTitle), so children stay
+                                // distinct even if their plugin Name/Description collide.
+                                Id = $"{parentId}|{child.TileTitle}",
+                                DisplayName = child.TileTitle,
+                                GroupName = multi.TileTitle,
+                                ProviderName = settings?.Provider?.ProviderName ?? string.Empty,
+                                Symbol = settings?.Symbol ?? string.Empty,
+                                IsConfigured = reason is null,
+                                UnavailableReason = reason
+                            });
+                        }
+                    }
+                    else if (plugin is IStudy study)
+                    {
+                        var settings = plugin.Settings;
+                        var reason = settings is null ? "Plugin has no settings." : settings.GetConfigurationError();
+                        result.Add(new StudyDescriptor
+                        {
+                            Id = plugin.GetPluginUniqueID(),
+                            DisplayName = study.TileTitle,
+                            GroupName = null,
+                            ProviderName = settings?.Provider?.ProviderName ?? string.Empty,
+                            Symbol = settings?.Symbol ?? string.Empty,
+                            IsConfigured = reason is null,
+                            UnavailableReason = reason
+                        });
+                    }
+                }
+            }
+            return result;
+        }
         public static async Task StartPluginsAsync()
         {
             List<Task> startTasks = new List<Task>();
