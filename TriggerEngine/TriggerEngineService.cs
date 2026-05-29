@@ -182,7 +182,24 @@ namespace VisualHFT.TriggerEngine
                     if (condition.Plugin != e.Plugin)
                         continue;
 
-                    bool isConditionMet = EvaluateDirect(condition, e.Value, previous);
+                    // OD-3 / GAP-MDR-14: a rule with a sustained Window must only
+                    // count as met once the condition has HELD for the full window.
+                    // Previously ProcessMetric called EvaluateDirect unconditionally
+                    // and IsConditionSatisfiedWithWindow was dead code, so windowed
+                    // rules fired instantly, ignoring their window. Key the window
+                    // tracking per rule+condition+symbol so independent symbols and
+                    // rules do not share a start time.
+                    bool isConditionMet;
+                    if (condition.Window != null && condition.Window.Duration > 0)
+                    {
+                        string conditionKey = $"{rule.RuleID}|{condition.ConditionID}|{metricKey}";
+                        isConditionMet = IsConditionSatisfiedWithWindow(
+                            condition, e.Value, previous, e.Timestamp, conditionKey);
+                    }
+                    else
+                    {
+                        isConditionMet = EvaluateDirect(condition, e.Value, previous);
+                    }
                     if (!isConditionMet)
                         continue; // Skip if condition is not satisfied
 
@@ -195,11 +212,16 @@ namespace VisualHFT.TriggerEngine
 
                         if (!ActionLastFiredTimes.TryGetValue(actionKey, out var lastFireTime))
                         {
-                            // First time, no previous firing. Fire immediately.
+                            // GAP-MDR-01: the FIRST qualifying fire from a clean
+                            // state must fire — the spec (FR-3.3.1 / S-08) treats
+                            // the first breach like any other. Previously this branch
+                            // only recorded the timestamp (ExecuteActionAsync and the
+                            // OnTriggerFired raise were commented out), so the first
+                            // breach was silently dropped and a fire only happened on
+                            // the second qualifying tick after cooldown.
                             ActionLastFiredTimes[actionKey] = e.Timestamp;
-
-                            //TODO: uncomment if we need to fire immediately if there is no previous firing
-                            //_ = ExecuteActionAsync(rule.Name, condition, action, e.Plugin, e.Metric, e.Value, e.Timestamp);
+                            _ = ExecuteActionAsync(rule.Name, condition, action, e.Plugin, e.Metric, e.Exchange, e.Symbol, e.Value, e.Timestamp);
+                            RaiseOnTriggerFired(rule, condition, e);
                         }
                         else
                         {

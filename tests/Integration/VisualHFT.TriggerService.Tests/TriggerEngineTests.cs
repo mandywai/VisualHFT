@@ -180,37 +180,39 @@ namespace VisualHFT.DataRetriever.TestingFramework.TestCases
         }
 
         [Fact]
-        public async Task Should_Not_Trigger_Immediately_When_Condition_Met()
+        public async Task Should_Trigger_Immediately_When_Condition_Met()
         {
             TriggerEngineService.ClearAllRules();
             // Arrange
             var cooldown = TimeSpan.FromSeconds(5);
             var rule = CreateRule(cooldown);
             TriggerEngineService.AddOrUpdateRule(rule);
-            
+
             var cts = new CancellationTokenSource();
             var workerTask = TriggerEngineService.StartBackgroundWorkerAsync(cts.Token);
 
 
             var now = DateTime.UtcNow;
 
-            // Act: Register first metric (meets condition)
+            // Act: first metric meets the condition — fires immediately. The spec
+            // (FR-3.3.1 / S-08) treats the first breach like any other; the prior
+            // "first fire records but does not execute" behavior was GAP-MDR-01.
             TriggerEngineService.RegisterMetric(PluginID, PluginName, Exchange, Symbol, 120.0, now);
 
             await Task.Delay(200); // simulate time for async processing
 
-            // Act again before cooldown ends
+            // Second metric 3s later — within the 5s cooldown, so suppressed.
             TriggerEngineService.RegisterMetric(PluginID, PluginName, Exchange, Symbol, 130.0, now.AddSeconds(3));
 
             await Task.Delay(200);
 
             int count = HelperNotificationManager.Instance.GetAllNotifications().Where(x => x.Category == HelprNorificationManagerCategories.TRIGGER_ENGINE && x.PluginID.Equals(PluginID)).Count();
 
-            Assert.Equal(0, count); // No notifications should be sent 
+            Assert.Equal(1, count); // first breach fires; the second is suppressed by cooldown
         }
 
         [Fact]
-        public async Task Should_Trigger_Only_After_Cooldown_If_Condition_Remains_True()
+        public async Task Should_Fire_On_First_Breach_And_Again_After_Cooldown()
         {
             TriggerEngineService.ClearAllRules();
             // Arrange
@@ -223,24 +225,24 @@ namespace VisualHFT.DataRetriever.TestingFramework.TestCases
 
             var baseTime = DateTime.UtcNow;
 
-            // Act 1: Trigger first match
+            // Act 1: first match — fires immediately (GAP-MDR-01 fix)
             TriggerEngineService.RegisterMetric(PluginID, PluginName, Exchange, Symbol, 120.0, baseTime);
             await Task.Delay(100);
 
-            // Act 2: Not yet past cooldown
+            // Act 2: 2s later — still within the 3s cooldown, suppressed
             TriggerEngineService.RegisterMetric(PluginID, PluginName, Exchange, Symbol, 125.0, baseTime.AddSeconds(2));
             await Task.Delay(100);
 
-            // Act 3: Past cooldown
+            // Act 3: 4s later — past cooldown, fires again
             TriggerEngineService.RegisterMetric(PluginID, PluginName, Exchange, Symbol, 130.0, baseTime.AddSeconds(4));
             await Task.Delay(100);
 
             int count = HelperNotificationManager.Instance.GetAllNotifications().Where(x => x.Category == HelprNorificationManagerCategories.TRIGGER_ENGINE && x.PluginID.Equals(PluginID)).Count();
-            Assert.Equal(1, count); //  notifications should be sent  since cooldown is staisfied
+            Assert.Equal(2, count); // first breach + one re-fire after the cooldown expires
         }
 
         [Fact]
-        public async Task Should_Not_Trigger_If_Condition_Broken_Before_Cooldown()
+        public async Task Should_Fire_On_First_Breach_Then_Not_ReFire_When_Condition_Breaks_Within_Cooldown()
         {
             TriggerEngineService.ClearAllRules();
             // Arrange
@@ -252,21 +254,23 @@ namespace VisualHFT.DataRetriever.TestingFramework.TestCases
 
             var baseTime = DateTime.UtcNow;
 
-            // Act: Trigger condition
+            // Act: first breach — fires immediately (GAP-MDR-01 fix)
             TriggerEngineService.RegisterMetric(PluginID, PluginName, Exchange, Symbol, 120.0, baseTime);
             await Task.Delay(100);
 
-            // Now condition breaks
+            // Condition breaks (below threshold) — no fire
             TriggerEngineService.RegisterMetric(PluginID, PluginName, Exchange, Symbol, 80.0, baseTime.AddSeconds(2));
             await Task.Delay(100);
 
-            // Condition true again, but should reset the cooldown
+            // Condition true again at +3s — within the 4s cooldown from the first
+            // fire, so no second fire.
             TriggerEngineService.RegisterMetric(PluginID, PluginName, Exchange, Symbol, 125.0, baseTime.AddSeconds(3));
             await Task.Delay(100);
 
-            // Final assert — we expect no  firing (after cooldown from last true condition)
+            // Exactly one fire: the first breach. The break + return is still
+            // inside the cooldown window, so it does not re-fire.
             int count = HelperNotificationManager.Instance.GetAllNotifications().Where(x => x.Category == HelprNorificationManagerCategories.TRIGGER_ENGINE && x.PluginID.Equals(PluginID)).Count();
-            Assert.Equal(0, count);
+            Assert.Equal(1, count);
 
 
         }

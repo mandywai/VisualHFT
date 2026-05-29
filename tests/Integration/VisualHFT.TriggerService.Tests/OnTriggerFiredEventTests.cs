@@ -83,14 +83,12 @@ public sealed class OnTriggerFiredEventTests : IDisposable
     }
 
     /// <summary>
-    /// Case 6 (T-S08-2): a single CrossesAbove rule fires once when the
-    /// metric crosses its threshold. The subscriber receives exactly one
+    /// Case 6 (T-S08-2): a GreaterThan rule fires once when the metric
+    /// breaches its threshold. The subscriber receives exactly one
     /// <see cref="TriggerFiredEventArgs"/> whose Timestamp ≈ fire time
     /// (within a generous 5 s wall-clock window so CI noise does not flake
-    /// it). Per Pattern AM (TestEngine first-fire-no-execute), we drive
-    /// TWO crossing cycles; the FIRST crossing records the action without
-    /// firing, the SECOND crossing actually fires and reaches the new
-    /// OnTriggerFired event.
+    /// it). Post GAP-MDR-01 fix the FIRST qualifying breach fires, so a single
+    /// event drives the assertion — no primer cycle.
     /// </summary>
     [Fact(Timeout = 30_000)]
     public async Task OnTriggerFired_FiresOnceWhenRuleSatisfied()
@@ -116,15 +114,12 @@ public sealed class OnTriggerFiredEventTests : IDisposable
             TriggerEngineService.AddOrUpdateRule(rule);
 
             DateTime fireTime = DateTime.UtcNow;
-            // Pattern AM: GreaterThan re-triggers on every matching value, so
-            // we need TWO matching events to clear first-fire-no-execute.
+            // GAP-MDR-01 fix: the first qualifying breach fires. A single
+            // GreaterThan event over the threshold is enough — no primer cycle.
             TriggerEngineService.RegisterMetric(Plugin, Metric, Exchange, Symbol, 150.0, fireTime);
-            await Task.Delay(50);
-            TriggerEngineService.RegisterMetric(Plugin, Metric, Exchange, Symbol, 160.0,
-                fireTime.AddMilliseconds(100));
 
             Assert.True(fired.Wait(TimeSpan.FromSeconds(5)),
-                "OnTriggerFired did not fire within 5 s of the second crossing.");
+                "OnTriggerFired did not fire within 5 s of the breach.");
             await Task.Delay(50);
 
             lock (capturedArgs)
@@ -137,7 +132,7 @@ public sealed class OnTriggerFiredEventTests : IDisposable
                 Assert.Equal(Metric, a.Metric);
                 Assert.Equal(Exchange, a.Exchange);
                 Assert.Equal(Symbol, a.Symbol);
-                Assert.Equal(160.0, a.Value);
+                Assert.Equal(150.0, a.Value);
                 Assert.Equal(100.0, a.Threshold);
                 Assert.Equal(ConditionOperator.GreaterThan, a.Operator);
                 Assert.True(
@@ -156,9 +151,9 @@ public sealed class OnTriggerFiredEventTests : IDisposable
     /// subscriber from receiving subsequent fires. Architecture §2.2.5:
     /// TriggerEngineService catches per-subscriber exceptions and emits
     /// a WARN. We subscribe both a throwing handler and a counting
-    /// handler, fire 10× (= 11 RegisterMetric calls because of first-fire-
-    /// no-execute), and assert the counter reaches 10 + a WARN log per
-    /// failure.
+    /// handler, fire 10× (10 RegisterMetric calls — post GAP-MDR-01 the first
+    /// breach fires too, so no primer), and assert the counter reaches 10 +
+    /// a WARN log per failure.
     /// </summary>
     [Fact(Timeout = 60_000)]
     public async Task OnTriggerFired_ThrowingSubscriberDoesNotBreakOthers()
@@ -189,10 +184,8 @@ public sealed class OnTriggerFiredEventTests : IDisposable
                 cooldownSeconds: 0);
             TriggerEngineService.AddOrUpdateRule(rule);
 
-            // First-fire-no-execute primer (Pattern AM).
-            TriggerEngineService.RegisterMetric(Plugin, Metric, Exchange, Symbol, 150.0, DateTime.UtcNow);
-            await Task.Delay(50);
-
+            // Post GAP-MDR-01: every qualifying breach fires, including the first.
+            // 10 breaches → 10 fires (cooldown 0).
             for (int i = 0; i < 10; i++)
             {
                 TriggerEngineService.RegisterMetric(
@@ -227,8 +220,8 @@ public sealed class OnTriggerFiredEventTests : IDisposable
     /// latency between RegisterMetric → OnTriggerFired must have a p99
     /// ≤ 1 ms across 10K fires. Driven inline (no BenchmarkDotNet host)
     /// because TriggerEngineService is process-static and we're already
-    /// in a test-runner host. Pattern AM applied: a primer cycle clears
-    /// first-fire-no-execute before the measured run.
+    /// in a test-runner host. Post GAP-MDR-01 the first breach fires, so every
+    /// measured RegisterMetric is a real fire — no primer needed.
     /// </summary>
     [Fact(Timeout = 120_000)]
     public async Task OnTriggerFired_HandlerLatency_p99_under_1ms()
@@ -260,8 +253,8 @@ public sealed class OnTriggerFiredEventTests : IDisposable
                 cooldownSeconds: 0);
             TriggerEngineService.AddOrUpdateRule(rule);
 
-            // First-fire-no-execute primer (Pattern AM).
-            TriggerEngineService.RegisterMetric(Plugin, Metric, Exchange, Symbol, 1.0, DateTime.UtcNow);
+            // Post GAP-MDR-01 the first breach fires, so no primer — every one
+            // of the N RegisterMetric calls below is a measured fire.
             await Task.Delay(100);
 
             for (int i = 0; i < N; i++)
