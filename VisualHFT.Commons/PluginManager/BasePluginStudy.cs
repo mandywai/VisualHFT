@@ -41,6 +41,10 @@ namespace VisualHFT.Commons.PluginManager
         public bool IsSettingsButtonVisisble { get; set; } = true;
         public bool IsFooterVisible { get; set; } = true;
 
+        // Declarative capability: emitting studies override this to true (see IStudy.EmitsMetric).
+        // Default false so non-emitting studies are excluded from the trigger-rule study picker.
+        public virtual bool EmitsMetric => false;
+
         public ePluginType PluginType
         {
             get { return ePluginType.STUDY; }

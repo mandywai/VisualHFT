@@ -1,110 +1,91 @@
 # Market Connector Template
 
-This directory contains a comprehensive template for building market‑data connectors for **VisualHFT**. The template includes all necessary components, best practices, and documentation to help developers create robust plugins from scratch.
+A working scaffold for a VisualHFT market-data connector. Compiles against
+the current `VisualHFT.Commons` API out of the box — clone, fill in the
+`TODO`s for your exchange, build, and the main app will pick it up.
 
-## Quick Start
+For a deeper walkthrough see [`MarketConnectorSDK_Guidelines.md`](MarketConnectorSDK_Guidelines.md).
 
-1. **Copy the template** - Duplicate this folder and rename it to your exchange name
-2. **Update namespace** - Replace `MarketConnector.Template` with your exchange name (e.g., `MarketConnector.MyExchange`)
-3. **Add exchange client** - Install your exchange's NuGet package in the .csproj file
-4. **Implement connection logic** - Follow the TODO comments in `TemplateExchangePlugin.cs`
-5. **Customize message parsing** - Update `JsonParser.cs` to match your exchange's format
-6. **Build and test** - Compile and place the DLL in VisualHFT's plugins folder
-
-## Documentation
-
-- **[MarketConnectorSDK_Guidelines.md](MarketConnectorSDK_Guidelines.md)** - Comprehensive development guide
-- **[SampleMessages/README.md](SampleMessages/README.md)** - Example message formats for testing
-
-## Template Structure
+## Layout
 
 ```
 SDK-MarketConnectorTemplate/
-├── TemplateExchangePlugin.cs        # Main plugin class in root (matches Binance, Kraken pattern)
-├── JsonParser.cs                    # Message parsing logic
-├── MarketConnector.Template.csproj  # Project configuration
-├── ViewModels/                      # MVVM ViewModels
-│   └── PluginSettingsViewModel.cs   # Settings UI logic with validation
-├── Model/                          # Data models
-│   ├── PlugInSettings.cs           # Configuration settings (matches Binance, Kraken pattern)
-│   └── ExchangeMessages.cs         # Exchange-specific message models
-├── UserControls/                   # WPF UI
-│   ├── PluginSettingsView.xaml     # Settings UI definition
-│   └── PluginSettingsView.xaml.cs  # Code-behind
-├── SampleMessages/                 # Test data
-│   ├── OrderBookSnapshot.json      # Sample order book
-│   ├── OrderBookUpdate.json        # Sample updates
-│   ├── Trade.json                  # Sample trade
-│   ├── Error.json                  # Sample error
-│   ├── Subscription.json           # Sample subscription
-│   └── README.md                   # Usage guide
-├── MarketConnectorSDK_Guidelines.md # Development guide
-└── README.md                       # This file
+├── TemplateExchangePlugin.cs        # Plugin class (extends BasePluginDataRetriever)
+├── MarketConnector.Template.csproj  # .NET 10 / WPF class library
+├── Model/PlugInSettings.cs          # Persisted settings (implements ISetting)
+├── ViewModels/PluginSettingsViewModel.cs
+├── UserControls/PluginSettingsView.xaml(.cs)
+├── SampleMessages/                  # Reference JSON payloads
+└── MarketConnectorSDK_Guidelines.md
 ```
 
-## Key Features Included
+The scaffold gives you the `BasePluginDataRetriever` overrides, MVVM settings
+UI with `IDataErrorInfo` validation, `SetReconnectionAction(...)` reconnect
+wiring, and a complete `ISetting` implementation. JSON parsing is deliberately
+left out — every exchange's payload shape is different.
 
-✅ **Complete Plugin Architecture** - Full implementation with proper inheritance from `BasePluginDataRetriever`  
-✅ **WebSocket Connection Handling** - Robust connection management with reconnection logic  
-✅ **Message Parsing Framework** - Flexible JSON parser with error handling  
-✅ **MVVM Settings UI** - WPF user control with validation and data binding  
-✅ **Comprehensive Documentation** - Detailed guidelines and examples  
-✅ **Sample Test Data** - JSON message samples for development and testing  
-✅ **Error Handling & Logging** - Production-ready error management  
-✅ **Resource Management** - Proper disposal and cleanup patterns  
+## Build your connector
 
-## Development Checklist
+1. **Copy** this folder next to the other connectors:
+   `VisualHFT.Plugins/MarketConnectors.<YourExchange>/`.
+2. **Rename** the project, namespace, and `TemplateExchangePlugin` class to
+   match your exchange (e.g. `MarketConnectors.MyExchange` /
+   `MyExchangePlugin`).
+3. **Pick a unique `ProviderID`** in `InitializeDefaultSettings()` (don't
+   collide with the existing providers in `VisualHFT.Plugins/MarketConnectors.*`).
+4. **Add your exchange's client library** as a NuGet `PackageReference` in
+   the `.csproj`, or implement your own WebSocket/REST client.
+5. **Fill in `InternalStartAsync()`** — subscribe to order-book and trade
+   feeds for every symbol returned by `GetAllNonNormalizedSymbols()`, and
+   call `GetNormalizedSymbol(raw)` to map exchange-native symbols to
+   VisualHFT's normalized form.
+6. **Fill in `StopAsync()`** — unsubscribe and dispose your client.
+7. **In your message callbacks**, build `VisualHFT.Model.OrderBook` /
+   `Trade` / `Order` instances and publish them via `RaiseOnDataReceived(...)`.
 
-- [ ] Update namespace from `MarketConnector.Template` to your exchange name
-- [ ] Add your exchange's NuGet package to `.csproj`
-- [ ] Implement WebSocket connection in `StartAsync()`
-- [ ] Update message models in `Model/ExchangeMessages.cs`
-- [ ] Customize parsing logic in `JsonParser.cs`
-- [ ] Add exchange-specific validation in settings
-- [ ] Test with sample messages in `SampleMessages/`
-- [ ] Update provider ID and metadata
-- [ ] Add unit tests for parser logic
-- [ ] Test with exchange's testnet/sandbox
+Publishing a trade looks like this:
 
-## Common Customizations
-
-### Authentication
 ```csharp
-// Add auth headers in ConnectWebSocket()
-_webSocket.Options.SetRequestHeader("Authorization", $"Bearer {settings.ApiKey}");
-```
-
-### Custom Message Types
-```csharp
-// Add new message types in JsonParser.cs
-private bool IsCustomMessage(JObject message)
+var trade = new VisualHFT.Model.Trade
 {
-    return message.ContainsKey("yourCustomField");
-}
+    ProviderId   = _settings.Provider.ProviderID,
+    ProviderName = _settings.Provider.ProviderName,
+    Symbol       = normalizedSymbol,
+    Price        = (double)raw.Price,
+    Size         = (double)raw.Quantity,
+    IsBuy        = raw.Side == "buy",
+    Timestamp    = DateTime.UtcNow
+};
+RaiseOnDataReceived(trade);
 ```
 
-### Additional Settings
-```csharp
-// Extend PlugInSettings.cs
-[Description("Your custom setting")]
-public string CustomSetting { get; set; }
+For order books, maintain a local `VisualHFT.Model.OrderBook` per symbol and
+apply deltas via `OrderBook.AddOrUpdateLevel(DeltaBookItem)` /
+`OrderBook.DeleteLevel(DeltaBookItem)`. See `MarketConnectors.Bitfinex` for a
+full reference.
+
+## Load it into VisualHFT
+
+At runtime, `VisualHFT.PluginManager.PluginManager.LoadPlugins()` scans the
+app's base directory for any `*.dll` that exposes a non-abstract type
+implementing `IPlugin` and instantiates it. There is no separate plugins
+folder — the DLL just needs to land next to `VisualHFT.exe`.
+
+The canonical way to get it there is to add a `ProjectReference` to the main
+app's `VisualHFT.csproj`:
+
+```xml
+<ProjectReference Include="VisualHFT.Plugins\MarketConnectors.MyExchange\MarketConnectors.MyExchange.csproj" />
 ```
 
-## Getting Help
+(See `VisualHFT.csproj` for the existing entries — Binance, Bitfinex, Kraken,
+etc.) Rebuild the solution and your plugin appears in VisualHFT's connector
+list automatically. No manual DLL copying, no registration step.
 
-1. Read the **[MarketConnectorSDK_Guidelines.md](MarketConnectorSDK_Guidelines.md)** for detailed instructions
-2. Check existing connectors (Binance, Kraken) for reference implementations
-3. Use the sample messages to test your parser
-4. Enable debug logging for troubleshooting
+## Reference implementations
 
-## Contributing
+When in doubt, copy the closest match:
 
-To improve this template:
-1. Fork the repository
-2. Make your changes
-3. Add documentation for new features
-4. Submit a pull request
-
----
-
-**Happy coding!** 🚀
+- `VisualHFT.Plugins/MarketConnectors.Bitfinex/` — small, REST + WebSocket, easy to read.
+- `VisualHFT.Plugins/MarketConnectors.Binance/` — uses a typed client SDK.
+- `VisualHFT.Plugins/MarketConnectors.Kraken/` — direct WebSocket parsing.

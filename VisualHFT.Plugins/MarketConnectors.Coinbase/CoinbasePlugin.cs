@@ -91,7 +91,7 @@ namespace MarketConnectors.Coinbase
                 if (!string.IsNullOrEmpty(_settings.ApiKey) && !string.IsNullOrEmpty(_settings.ApiSecret))
                 {
 
-                    options.ApiCredentials = new ApiCredentials(_settings.ApiKey, _settings.ApiSecret);
+                    options.ApiCredentials = new CoinbaseCredentials(_settings.ApiKey, _settings.ApiSecret);
                 }
 
                 options.Environment = CoinbaseEnvironment.Live;
@@ -102,7 +102,7 @@ namespace MarketConnectors.Coinbase
             {
                 if (!string.IsNullOrEmpty(_settings.ApiKey) && !string.IsNullOrEmpty(_settings.ApiSecret))
                 {
-                    options.ApiCredentials = new ApiCredentials(_settings.ApiKey, _settings.ApiSecret);
+                    options.ApiCredentials = new CoinbaseCredentials(_settings.ApiKey, _settings.ApiSecret);
                 }
 
                 options.Environment = CoinbaseEnvironment.Live;

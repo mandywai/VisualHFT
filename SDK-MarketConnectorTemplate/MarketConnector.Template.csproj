@@ -7,9 +7,9 @@
     additional third‑party packages to speak to specific exchanges.
   -->
   <PropertyGroup>
-    <!-- Target .NET 8 on Windows.  The UseWPF flag is required by
+    <!-- Target .NET 10 on Windows.  The UseWPF flag is required by
          VisualHFT even though plug‑ins themselves do not create windows. -->
-    <TargetFramework>net8.0-windows10.0.17763.0</TargetFramework>
+    <TargetFramework>net10.0-windows10.0.17763.0</TargetFramework>
     <Nullable>enable</Nullable>
     <UseWPF>true</UseWPF>
     <SupportedOSPlatformVersion>10.0.17763.0</SupportedOSPlatformVersion>
@@ -31,7 +31,7 @@
          Remove this line if you plan to implement your own WebSocket/REST
          client. -->
     <!-- <PackageReference Include="ExchangeApi.Net" Version="1.0.0" /> -->
-    <PackageReference Include="log4net" Version="3.2.0" />
+    <PackageReference Include="log4net" Version="3.3.1" />
     <PackageReference Include="Newtonsoft.Json" Version="13.0.4" />
   </ItemGroup>
 

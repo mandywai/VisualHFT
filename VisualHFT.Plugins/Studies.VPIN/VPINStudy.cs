@@ -50,6 +50,9 @@ namespace VisualHFT.Studies
         // Event declaration
         public override event EventHandler<decimal> OnAlertTriggered;
 
+        // Emits a metric via AddCalculation -> the trigger picker lists this study (IStudy.EmitsMetric).
+        public override bool EmitsMetric => true;
+
         public override string Name { get; set; } = "VPIN Study Plugin";
         public override string Version { get; set; } = "1.0.0";
         public override string Description { get; set; } = "Volume-Synchronized Probability of Informed Trading (VPIN) measures buy/sell volume imbalance in fixed buckets. Provides real-time risk assessment (0-1 scale) for market instability detection.";

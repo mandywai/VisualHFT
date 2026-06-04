@@ -82,14 +82,18 @@ namespace MarketConnectors.Kraken
             {
 
                 if (_settings.ApiKey != "" && _settings.ApiSecret != "")
-                    options.ApiCredentials = new ApiCredentials(_settings.ApiKey, _settings.ApiSecret);
+                {
+                    options.ApiCredentials = new KrakenCredentials() { Spot = new HMACCredential(_settings.ApiKey, _settings.ApiSecret) };
+                }
                 options.Environment = KrakenEnvironment.Live;
             });
 
             _restClient = new KrakenRestClient(options =>
             {
                 if (_settings.ApiKey != "" && _settings.ApiSecret != "")
-                    options.ApiCredentials = new ApiCredentials(_settings.ApiKey, _settings.ApiSecret);
+                {
+                    options.ApiCredentials = new KrakenCredentials() { Spot = new HMACCredential(_settings.ApiKey, _settings.ApiSecret) };
+                }
                 options.Environment = KrakenEnvironment.Live;
             });
 

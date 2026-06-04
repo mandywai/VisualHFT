@@ -4,7 +4,7 @@
         xmlns:d="http://schemas.microsoft.com/expression/blend/2008"
         xmlns:mc="http://schemas.openxmlformats.org/markup-compatibility/2006"
         xmlns:local="clr-namespace:VisualHFT.TriggerEngine.View"
-        xmlns:enums="clr-namespace:VisualHFT.TriggerEngine"
+        xmlns:enums="clr-namespace:VisualHFT.TriggerEngine;assembly=VisualHFT.Commons"
         xmlns:converters="clr-namespace:VisualHFT.Converters"
         mc:Ignorable="d"  
 TextElement.FontWeight="Regular"
@@ -125,9 +125,70 @@ TextOptions.TextRenderingMode="Auto"
                                     <DataGridTemplateColumn  Header="Plugin"  HeaderStyle="{DynamicResource RightAlignedHeader}">
                                         <DataGridTemplateColumn.CellTemplate>
                                             <DataTemplate>
-                                                <ComboBox ItemsSource="{Binding PluginNames, RelativeSource={RelativeSource AncestorType=Window}}" DisplayMemberPath="TileName"
-                                              SelectedValue="{Binding Plugin, Mode=TwoWay, UpdateSourceTrigger=PropertyChanged}"  SelectedValuePath="PluginID" SelectionChanged="ComboBox_SelectionChanged_1"
-                                              Width="150" />    
+                                                <ComboBox ItemsSource="{Binding PluginNames, RelativeSource={RelativeSource AncestorType=Window}}"
+                                              SelectedValue="{Binding Plugin, Mode=TwoWay, UpdateSourceTrigger=PropertyChanged}" SelectedValuePath="Id" SelectionChanged="ComboBox_SelectionChanged_1"
+                                              IsSynchronizedWithCurrentItem="False" Width="150">
+                                                    <ComboBox.ItemTemplate>
+                                                        <DataTemplate>
+                                                            <StackPanel Orientation="Horizontal">
+                                                                <!-- Warning glyph shown only for unconfigured studies; its tooltip says what's missing. -->
+                                                                <TextBlock Text="⚠️" Margin="0,0,5,0" VerticalAlignment="Center"
+                                                                           ToolTipService.ShowOnDisabled="True"
+                                                                           ToolTip="{Binding UnavailableReason}">
+                                                                    <TextBlock.Style>
+                                                                        <Style TargetType="TextBlock">
+                                                                            <Setter Property="Visibility" Value="Collapsed" />
+                                                                            <Style.Triggers>
+                                                                                <DataTrigger Binding="{Binding IsConfigured}" Value="False">
+                                                                                    <Setter Property="Visibility" Value="Visible" />
+                                                                                </DataTrigger>
+                                                                            </Style.Triggers>
+                                                                        </Style>
+                                                                    </TextBlock.Style>
+                                                                </TextBlock>
+                                                                <StackPanel>
+                                                                    <TextBlock Text="{Binding DisplayName}" />
+                                                                    <TextBlock FontSize="8" Opacity="0.6">
+                                                                        <Run Text="{Binding ProviderName, Mode=OneWay}" /><Run Text=": " /><Run Text="{Binding Symbol, Mode=OneWay}" />
+                                                                    </TextBlock>
+                                                                </StackPanel>
+                                                            </StackPanel>
+                                                        </DataTemplate>
+                                                    </ComboBox.ItemTemplate>
+                                                    <ComboBox.GroupStyle>
+                                                        <GroupStyle>
+                                                            <GroupStyle.HeaderTemplate>
+                                                                <DataTemplate>
+                                                                    <!-- Parent name for multi-study children; collapsed for standalone studies (null group). -->
+                                                                    <TextBlock Text="{Binding Name}" FontWeight="Bold" Opacity="0.8" Margin="2,4,0,2">
+                                                                        <TextBlock.Style>
+                                                                            <Style TargetType="TextBlock">
+                                                                                <Style.Triggers>
+                                                                                    <DataTrigger Binding="{Binding Name}" Value="{x:Null}">
+                                                                                        <Setter Property="Visibility" Value="Collapsed" />
+                                                                                    </DataTrigger>
+                                                                                </Style.Triggers>
+                                                                            </Style>
+                                                                        </TextBlock.Style>
+                                                                    </TextBlock>
+                                                                </DataTemplate>
+                                                            </GroupStyle.HeaderTemplate>
+                                                        </GroupStyle>
+                                                    </ComboBox.GroupStyle>
+                                                    <ComboBox.ItemContainerStyle>
+                                                        <!-- Unconfigured studies are listed but cannot be selected (ISetting.IsConfigured). -->
+                                                        <Style TargetType="ComboBoxItem">
+                                                            <Setter Property="IsEnabled" Value="{Binding IsConfigured}" />
+                                                            <Setter Property="ToolTipService.ShowOnDisabled" Value="True" />
+                                                            <Style.Triggers>
+                                                                <DataTrigger Binding="{Binding IsConfigured}" Value="False">
+                                                                    <Setter Property="Opacity" Value="0.5" />
+                                                                    <Setter Property="ToolTip" Value="{Binding UnavailableReason}" />
+                                                                </DataTrigger>
+                                                            </Style.Triggers>
+                                                        </Style>
+                                                    </ComboBox.ItemContainerStyle>
+                                                </ComboBox>
 
                                             </DataTemplate>
                                         </DataGridTemplateColumn.CellTemplate>

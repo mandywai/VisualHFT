@@ -218,7 +218,7 @@ namespace MarketConnectors.Binance
             _socketClient = new BinanceSocketClient(options =>
             {
                 if (_settings.ApiKey != "" && _settings.ApiSecret != "")
-                    options.ApiCredentials = new ApiCredentials(_settings.ApiKey, _settings.ApiSecret);
+                    options.ApiCredentials = new BinanceCredentials(_settings.ApiKey, _settings.ApiSecret);
                 if (_settings.IsNonUS)
                     options.Environment = BinanceEnvironment.Live;
                 else
@@ -228,7 +228,7 @@ namespace MarketConnectors.Binance
             _restClient = new BinanceRestClient(options =>
             {
                 if (_settings.ApiKey != "" && _settings.ApiSecret != "")
-                    options.ApiCredentials = new ApiCredentials(_settings.ApiKey, _settings.ApiSecret);
+                    options.ApiCredentials = new BinanceCredentials(_settings.ApiKey, _settings.ApiSecret);
                 if (_settings.IsNonUS)
                     options.Environment = BinanceEnvironment.Live;
                 else

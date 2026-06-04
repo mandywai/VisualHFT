@@ -31,6 +31,9 @@ namespace VisualHFT.Studies
         // Event declaration
         public override event EventHandler<decimal> OnAlertTriggered;
 
+        // Emits a metric via AddCalculation -> the trigger picker lists this study (IStudy.EmitsMetric).
+        public override bool EmitsMetric => true;
+
 
         public override string Name { get; set; } = "Market Resilience Study";
         public override string Version { get; set; } = "1.0.0";

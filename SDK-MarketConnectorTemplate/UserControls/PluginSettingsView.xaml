@@ -1,85 +1,67 @@
-﻿<UserControl x:Class="MarketConnector.Template.UserControls.PluginSettingsView"
+<UserControl x:Class="MarketConnector.Template.UserControls.PluginSettingsView"
              xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
              xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
              xmlns:d="http://schemas.microsoft.com/expression/blend/2008"
              xmlns:mc="http://schemas.openxmlformats.org/markup-compatibility/2006"
              mc:Ignorable="d"
-             d:DesignHeight="450" d:DesignWidth="800">
-    <!--
-        This XAML file defines a simple settings page for a market connector.
-        It mirrors the look and feel of the built‑in connectors in VisualHFT
-        and is meant to be customised by developers.  Bindings on text boxes
-        point directly at the properties on your settings class (see
-        TemplateSettings.cs).  When you add or remove settings, update the
-        bindings accordingly.
-    -->
+             d:DesignHeight="500" d:DesignWidth="600">
     <ScrollViewer VerticalScrollBarVisibility="Auto">
-        <StackPanel Margin="10" Orientation="Vertical" >
-            <!-- Header explaining why API keys are optional -->
-            <TextBlock Text="Why API keys are needed?" FontWeight="Bold" Margin="0,0,0,5"/>
-            <TextBlock TextWrapping="Wrap" Margin="0,0,0,10">
-                API keys allow the connector to access real‑time market data from the
-                exchange, including full depth and authenticated streams.  If you
-                leave these fields empty the plug‑in will only subscribe to
-                publicly available data.  Your API credentials are stored
-                locally on your machine and are never shared.
-            </TextBlock>
-            <TextBlock Margin="0,0,0,10">
-                <Hyperlink NavigateUri="https://www.example.com" RequestNavigate="Hyperlink_RequestNavigate">API creation page</Hyperlink>
-            </TextBlock>
+        <StackPanel Margin="10" Orientation="Vertical">
+
+            <!-- Provider identity -->
+            <Label Content="Provider ID" Margin="0,0,0,0"/>
+            <TextBox Text="{Binding ProviderId, ValidatesOnDataErrors=True, UpdateSourceTrigger=PropertyChanged}" Margin="0,5"/>
+
+            <Label Content="Provider Name" Margin="0,10,0,0"/>
+            <TextBox Text="{Binding ProviderName, ValidatesOnDataErrors=True, UpdateSourceTrigger=PropertyChanged}" Margin="0,5"/>
 
             <!-- API credentials -->
-            <Grid Margin="0,10,0,10" >
-                <Grid.ColumnDefinitions>
-                    <ColumnDefinition Width="Auto"/>
-                    <ColumnDefinition Width="*"/>
-                </Grid.ColumnDefinitions>
-                <Grid.RowDefinitions>
-                    <RowDefinition Height="Auto"/>
-                    <RowDefinition Height="Auto"/>
-                    <RowDefinition Height="Auto"/>
-                    <RowDefinition Height="Auto"/>
-                    <RowDefinition Height="Auto"/>
-                </Grid.RowDefinitions>
+            <TextBlock Text="API Key (optional — only required for authenticated streams)"
+                       FontWeight="Bold" Margin="0,20,0,5"/>
+            <TextBox Text="{Binding ApiKey, Mode=TwoWay, UpdateSourceTrigger=PropertyChanged}" Margin="0,5"/>
 
-                <!-- API key -->
-                <TextBlock Text="API Key:" VerticalAlignment="Center" Grid.Row="0" Grid.Column="0" Margin="0,0,5,5"/>
-                <TextBox Text="{Binding ApiKey, Mode=TwoWay, UpdateSourceTrigger=PropertyChanged}" Grid.Row="0" Grid.Column="1" Margin="0,0,0,5"/>
+            <Label Content="API Secret" Margin="0,10,0,0"/>
+            <TextBox Text="{Binding ApiSecret, Mode=TwoWay, UpdateSourceTrigger=PropertyChanged}" Margin="0,5"/>
 
-                <!-- API secret -->
-                <TextBlock Text="API Secret:" VerticalAlignment="Center" Grid.Row="1" Grid.Column="0" Margin="0,0,5,5"/>
-                <PasswordBox Password="{Binding ApiSecret, Mode=TwoWay, UpdateSourceTrigger=PropertyChanged}" Grid.Row="1" Grid.Column="1" Margin="0,0,0,5"/>
-
-                <!-- Symbols -->
-                <TextBlock Text="Symbols:" VerticalAlignment="Center" Grid.Row="2" Grid.Column="0" Margin="0,0,5,5"/>
-                <TextBox Text="{Binding Symbols, Mode=TwoWay, UpdateSourceTrigger=PropertyChanged}" Grid.Row="2" Grid.Column="1" Margin="0,0,0,5"/>
-
-                <!-- Depth levels -->
-                <TextBlock Text="Depth Levels:" VerticalAlignment="Center" Grid.Row="3" Grid.Column="0" Margin="0,0,5,5"/>
-                <TextBox Text="{Binding DepthLevels, Mode=TwoWay, UpdateSourceTrigger=PropertyChanged}" Grid.Row="3" Grid.Column="1" Margin="0,0,0,5"/>
-
-                <!-- Aggregation level -->
-                <TextBlock Text="Aggregation (ms):" VerticalAlignment="Center" Grid.Row="4" Grid.Column="0" Margin="0,0,5,0"/>
-                <TextBox Text="{Binding AggregationLevelMs, Mode=TwoWay, UpdateSourceTrigger=PropertyChanged}" Grid.Row="4" Grid.Column="1" />
-            </Grid>
-
-            <Separator Margin="0,10"/>
-
-            <!-- Symbol normalisation info -->
-            <TextBlock Text="Symbol Normalisation Explained" FontWeight="Bold" Margin="0,0,0,5"/>
-            <TextBlock TextWrapping="Wrap" Margin="0,0,0,5">
-                Different exchanges use varying symbol formats for the same financial
-                instrument.  For consistent analysis across exchanges it is often
-                beneficial to normalise symbols.  For example, BTCUSDT on Binance
-                and tBTCUSD on Bitfinex can both be represented as BTC/USD.
+            <TextBlock TextWrapping="Wrap" Margin="0,5,0,0" Foreground="Gray">
+                Credentials are stored locally on this machine. Leave empty if your exchange exposes order-book and trade
+                data through public endpoints.
             </TextBlock>
-            <TextBlock TextWrapping="Wrap" Margin="0,0,0,5">
-                You can define the normalisation directly inside the symbol input
-                using parentheses: BTCUSDT(BTC/USD),ETHUSDT(ETH/USD).  The text
-                before the parentheses is the native exchange symbol; the text
-                inside the parentheses is your normalised representation.  If you
-                omit parentheses no normalisation occurs.
+
+            <!-- Symbols -->
+            <Label Content="Symbols (comma-separated)" Margin="0,20,0,0"/>
+            <TextBox Margin="0,5"
+                     Text="{Binding SymbolsText, ValidatesOnDataErrors=True, UpdateSourceTrigger=PropertyChanged}"
+                     ToolTip="Format per entry: RAW or RAW(NORMALIZED). Example: BTCUSDT(BTC/USD),ETHUSDT(ETH/USD)">
+                <TextBox.Style>
+                    <Style TargetType="TextBox">
+                        <Style.Triggers>
+                            <Trigger Property="Validation.HasError" Value="true">
+                                <Setter Property="Background" Value="LightPink"/>
+                                <Setter Property="ToolTip"
+                                        Value="{Binding RelativeSource={RelativeSource Self}, Path=(Validation.Errors)[0].ErrorContent}"/>
+                            </Trigger>
+                        </Style.Triggers>
+                    </Style>
+                </TextBox.Style>
+            </TextBox>
+
+            <TextBlock TextWrapping="Wrap" Margin="0,5,0,0" Foreground="Gray">
+                Use parentheses to map an exchange-native symbol to the normalized symbol VisualHFT will display.
+                For example, BTCUSDT(BTC/USD) tells the plug-in that the raw symbol BTCUSDT corresponds to BTC/USD.
             </TextBlock>
+
+            <!-- Depth levels -->
+            <Label Content="Depth Levels" Margin="0,20,0,0"/>
+            <TextBox Text="{Binding DepthLevels, ValidatesOnDataErrors=True, UpdateSourceTrigger=PropertyChanged}" Margin="0,5"/>
+
+            <!-- Actions -->
+            <StackPanel Orientation="Horizontal" HorizontalAlignment="Right" Margin="0,20,0,0">
+                <Label Content="{Binding ValidationMessage}" Foreground="Red" Margin="0,0,20,0"/>
+                <Button Content="OK"     Command="{Binding OkCommand}"     Margin="0,0,5,0" Width="80"/>
+                <Button Content="Cancel" Command="{Binding CancelCommand}" Width="80"/>
+            </StackPanel>
+
         </StackPanel>
     </ScrollViewer>
 </UserControl>

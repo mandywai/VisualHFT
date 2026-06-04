@@ -1,545 +1,272 @@
 using System;
 using System.Collections.Generic;
-using System.Net.WebSockets;
-using System.Text;
-using System.Threading;
 using System.Threading.Tasks;
+using log4net;
+using MarketConnector.Template.Model;
+using MarketConnector.Template.UserControls;
+using MarketConnector.Template.ViewModels;
+using VisualHFT.Commons.PluginManager;
+using VisualHFT.Enums;
 using VisualHFT.Model;
 using VisualHFT.PluginManager;
 using VisualHFT.UserSettings;
 
 namespace MarketConnector.Template
 {
-    /// <summary>
-    /// Template for a market connector plugin. Implement IPlugin and derive from BasePluginDataRetriever
-    /// to receive market data and push it into the VisualHFT helper classes.
-    /// </summary>
-    public class TemplateExchangePlugin : VisualHFT.Commons.PluginManager.BasePluginDataRetriever
+    // -----------------------------------------------------------------------
+    // Market Connector scaffold for VisualHFT.
+    //
+    // To turn this into a working connector for a real exchange:
+    //   1. Add a NuGet reference for your exchange's client SDK (e.g.
+    //      Binance.Net, Bitfinex.Net, KrakenExchange.Net, etc.) — or implement
+    //      your own WebSocket / REST client.
+    //   2. Fill in InternalStartAsync() with subscription + snapshot logic.
+    //   3. Convert each incoming message into a VisualHFT.Model.OrderBook,
+    //      Trade, or Order and publish via RaiseOnDataReceived(...).
+    //   4. Update Provider.ProviderID / ProviderName in InitializeDefaultSettings()
+    //      to a stable, unique value for your exchange.
+    //
+    // Compare against the existing Binance / Bitfinex / Kraken plugins under
+    // VisualHFT.Plugins/MarketConnectors.* for full reference implementations.
+    // -----------------------------------------------------------------------
+    public class TemplateExchangePlugin : BasePluginDataRetriever
     {
-        #region Private Fields
-        
-        private ClientWebSocket _webSocket;
-        private CancellationTokenSource _cancellationTokenSource;
-        private Task _receiveTask;
-        private readonly SemaphoreSlim _connectionLock = new SemaphoreSlim(1, 1);
-        private int _reconnectionAttempts = 0;
-        private readonly Dictionary<string, long> _lastSequences = new Dictionary<string, long>();
-        private bool _disposed = false; // Hides inherited member - use new to avoid warning
-        
-        // Provider information
-        private const int PROVIDER_ID = 999; // TODO: Change to a unique ID for your exchange
-        private const string PROVIDER_NAME = "TemplateExchange";
-        
-        // Constants
-        private const int MAX_RECONNECTION_ATTEMPTS = 5;
-        private const int RECONNECTION_DELAY_MS = 1000;
-        private const int BUFFER_SIZE = 4096;
-        
-        private static readonly log4net.ILog log = log4net.LogManager.GetLogger(System.Reflection.MethodBase.GetCurrentMethod().DeclaringType);
-        
-        #endregion
+        private static readonly ILog log = LogManager.GetLogger(typeof(TemplateExchangePlugin));
+
+        private PlugInSettings _settings = new PlugInSettings();
+        private new bool _disposed;
+
+        public override string Name { get; set; } = "Template Exchange Plugin";
+        public override string Version { get; set; } = "0.1.0";
+        public override string Description { get; set; } = "Scaffold connector — replace with your exchange logic.";
+        public override string Author { get; set; } = "VisualHFT Community";
+        public override ISetting Settings
+        {
+            get => _settings;
+            set => _settings = (PlugInSettings)value;
+        }
+        public override Action CloseSettingWindow { get; set; } = () => { };
+
         public TemplateExchangePlugin()
         {
-            Name = "TemplateExchange";
-            Description = "Connects to TemplateExchange and streams order book and trade data.";
-            Author = "Developer Name";
-            Version = "0.0.1";
-            Settings = new Model.PlugInSettings();
-            _cancellationTokenSource = new CancellationTokenSource();
+            // Wire automatic reconnection. The base class invokes
+            // InternalStartAsync() whenever HandleConnectionLost() fires.
+            SetReconnectionAction(InternalStartAsync);
+            log.Info($"{Name} has been loaded.");
         }
 
-        // Required properties
-        public override string Name { get; set; }
-        public override string Version { get; set; }
-        public override string Description { get; set; }
-        public override string Author { get; set; }
-        public override ISetting Settings { get; set; }
-        public override Action CloseSettingWindow { get; set; }
+        ~TemplateExchangePlugin()
+        {
+            Dispose(false);
+        }
 
-        /// <summary>
-        /// Start the plugin asynchronously. Initialize connections to the exchange API here.
-        /// Use Settings values such as API keys, symbols, depth levels, etc.
-        /// </summary>
         public override async Task StartAsync()
         {
-            await _connectionLock.WaitAsync();
+            await base.StartAsync(); // sets Status = STARTING
+
+            // TODO: instantiate your exchange client(s) here using _settings.
+            //       Example:
+            //   _socketClient = new MyExchangeSocketClient(_settings.ApiKey, _settings.ApiSecret);
+            //   _restClient   = new MyExchangeRestClient(_settings.ApiKey, _settings.ApiSecret);
+
+            RaiseOnDataReceived(GetProviderModel(eSESSIONSTATUS.CONNECTING));
+
             try
             {
-                if (Status == ePluginStatus.STARTED)
-                {
-                    log.Warn("Plugin is already started");
+                await InternalStartAsync();
+                if (Status == ePluginStatus.STOPPED_FAILED)
                     return;
-                }
-
-                Status = ePluginStatus.STARTING;
-                log.Info($"Starting {PROVIDER_NAME} plugin...");
-                
-                // Validate settings
-                var validationErrors = ValidateSettings();
-                if (validationErrors.Count > 0)
-                {
-                    var errorMessage = $"Invalid settings: {string.Join(", ", validationErrors)}";
-                    log.Error(errorMessage);
-                    throw new InvalidOperationException(errorMessage);
-                }
-                
-                // TODO: Initialize your exchange client here
-                // Example:
-                // _exchangeClient = new TemplateExchangeClient(Settings.ApiKey, Settings.ApiSecret);
-                // 
-                // If using WebSocket directly:
-                await ConnectWebSocket();
-                
-                // TODO: Subscribe to data feeds
-                // Example:
-                // await SubscribeToOrderBook();
-                // await SubscribeToTrades();
-                
-                Status = ePluginStatus.STARTED;
-                log.Info($"{PROVIDER_NAME} plugin started successfully");
             }
             catch (Exception ex)
             {
-                Status = ePluginStatus.STOPPED;
-                log.Error($"Failed to start {PROVIDER_NAME} plugin", ex);
-                throw;
-            }
-            finally
-            {
-                _connectionLock.Release();
+                LogException(ex);
+                await HandleConnectionLost(ex.Message, ex);
             }
         }
 
-        /// <summary>
-        /// Stop the plugin asynchronously. Close connections and clean up resources.
-        /// </summary>
+        // The reconnection-aware startup body. Do NOT call this directly from
+        // outside StartAsync — the base class wires it as the reconnect target.
+        private async Task InternalStartAsync()
+        {
+            // TODO: subscribe to order-book and trade feeds for every configured symbol.
+            //       Use GetAllNonNormalizedSymbols() to iterate over the raw exchange
+            //       symbols, and GetNormalizedSymbol(raw) to resolve VisualHFT's
+            //       normalized representation (e.g. BTC/USD).
+            foreach (var rawSymbol in GetAllNonNormalizedSymbols())
+            {
+                var normalized = GetNormalizedSymbol(rawSymbol);
+                log.Info($"{Name}: subscribing {normalized} (raw={rawSymbol})");
+
+                // Example shape — replace with real subscription calls:
+                //   await _socketClient.SubscribeToOrderBookUpdatesAsync(rawSymbol,
+                //       _settings.DepthLevels, update => OnOrderBookUpdate(update, normalized));
+                //   await _socketClient.SubscribeToTradeUpdatesAsync(rawSymbol,
+                //       trade => OnTrade(trade, normalized));
+            }
+
+            await Task.CompletedTask;
+
+            // Tell VisualHFT the provider is live, then mark the plugin as STARTED.
+            RaiseOnDataReceived(GetProviderModel(eSESSIONSTATUS.CONNECTED));
+            Status = ePluginStatus.STARTED;
+            log.Info($"{Name} started.");
+        }
+
         public override async Task StopAsync()
         {
-            await _connectionLock.WaitAsync();
-            try
-            {
-                if (Status == ePluginStatus.STOPPED)
-                {
-                    log.Warn("Plugin is already stopped");
-                    return;
-                }
+            Status = ePluginStatus.STOPPING;
+            log.Info($"{Name} is stopping.");
 
-                Status = ePluginStatus.STOPPING;
-                log.Info($"Stopping {PROVIDER_NAME} plugin...");
-                
-                // TODO: Disconnect from the exchange API and dispose of resources
-                // Example:
-                // await _exchangeClient?.DisconnectAsync();
-                // _exchangeClient?.Dispose();
-                
-                await DisconnectWebSocket();
-                
-                Status = ePluginStatus.STOPPED;
-                log.Info($"{PROVIDER_NAME} plugin stopped successfully");
-            }
-            catch (Exception ex)
-            {
-                log.Error($"Error stopping {PROVIDER_NAME} plugin", ex);
-            }
-            finally
-            {
-                _connectionLock.Release();
-            }
+            // TODO: unsubscribe and dispose any open WebSocket / REST clients.
+            //   await _socketClient?.UnsubscribeAllAsync();
+            //   _socketClient?.Dispose();
+            //   _restClient?.Dispose();
+
+            // Clear any provider-specific order books from VisualHFT's UI, then
+            // tell the framework the provider is disconnected.
+            RaiseOnDataReceived(new List<OrderBook>());
+            RaiseOnDataReceived(GetProviderModel(eSESSIONSTATUS.DISCONNECTED));
+
+            await base.StopAsync();
         }
 
-        /// <summary>
-        /// Initialize default settings for the plugin. Invoked on construction.
-        /// </summary>
-        protected override void InitializeDefaultSettings()
+        // -------------------------------------------------------------------
+        // Conversion helpers (templates — adapt to your exchange's payloads).
+        // -------------------------------------------------------------------
+
+        // Example of how to publish a trade. Build a VisualHFT.Model.Trade and
+        // hand it to the base class via RaiseOnDataReceived.
+        private void OnTrade(/* raw exchange trade payload */ object rawTrade, string normalizedSymbol)
         {
-            Settings = new Model.PlugInSettings
+            var trade = new Trade
             {
-                ApiKey = string.Empty,
-                ApiSecret = string.Empty,
-                Symbols = "BTC-USD,ETH-USD",  // comma-separated list of symbols
-                DepthLevels = 20,
-                AggregationLevel = VisualHFT.Enums.AggregationLevel.Ms100,
-                EnableReconnection = true,
-                MaxReconnectionAttempts = MAX_RECONNECTION_ATTEMPTS,
-                ConnectionTimeoutMs = 5000,
-                UseTestnet = false,
-                Environment = "production",
-                EnableDebugLogging = false
+                ProviderId = _settings.Provider.ProviderID,
+                ProviderName = _settings.Provider.ProviderName,
+                Symbol = normalizedSymbol,
+                // Price       = (double) rawTrade.Price,
+                // Size        = (double) rawTrade.Quantity,
+                // IsBuy       = rawTrade.Side == "buy",
+                Timestamp = DateTime.UtcNow
             };
+            RaiseOnDataReceived(trade);
         }
 
-        /// <summary>
-        /// Load settings from persistent storage.
-        /// TODO: Implement settings loading logic based on your requirements.
-        /// </summary>
+        // Example of how to publish order-book deltas. See Bitfinex/Binance for
+        // how to maintain a local OrderBook per symbol and apply deltas using
+        // OrderBook.AddOrUpdateLevel(DeltaBookItem) / DeleteLevel(DeltaBookItem).
+        private void OnOrderBookUpdate(/* raw exchange book update */ object rawUpdate, string normalizedSymbol)
+        {
+            // TODO: parse rawUpdate into one or more DeltaBookItem instances
+            //       and apply them to a per-symbol VisualHFT.Model.OrderBook
+            //       instance, then call RaiseOnDataReceived(orderBook).
+        }
+
+        // -------------------------------------------------------------------
+        // ISetting / persistence overrides.
+        // -------------------------------------------------------------------
+
         protected override void LoadSettings()
         {
-            // TODO: Load settings from configuration file, registry, or database
-            // Example:
-            // var loaded = SettingsManager.Load<Model.PlugInSettings>("TemplateExchange");
-            // if (loaded != null)
-            //     Settings = loaded;
-        }
-
-        /// <summary>
-        /// Save settings to persistent storage.
-        /// TODO: Implement settings saving logic based on your requirements.
-        /// </summary>
-        protected override void SaveSettings()
-        {
-            // TODO: Save settings to configuration file, registry, or database
-            // Example:
-            // SettingsManager.Save(Settings, "TemplateExchange");
-        }
-
-        /// <summary>
-        /// Get the UI settings control for configuration.
-        /// Returns the WPF user control for plugin settings.
-        /// </summary>
-        public override object GetUISettings()
-        {
-            // Create and return the settings view with its ViewModel
-            var view = new UserControls.PluginSettingsView();
-            var viewModel = new ViewModels.PluginSettingsViewModel(
-                Settings as Model.PlugInSettings,
-                () => CloseSettingWindow?.Invoke()
-            );
-            view.DataContext = viewModel;
-            return view;
-        }
-        
-        #region Private Methods
-        
-        /// <summary>
-        /// Validates the current settings and returns a list of errors.
-        /// </summary>
-        private List<string> ValidateSettings()
-        {
-            var errors = new List<string>();
-            var settings = Settings as Model.PlugInSettings;
-            
-            if (settings == null)
+            var loaded = LoadFromUserSettings<PlugInSettings>();
+            if (loaded == null)
             {
-                errors.Add("Settings is not of type PlugInSettings");
-                return errors;
-            }
-            
-            // TODO: Add your validation logic
-            // Example:
-            // if (!settings.UseTestnet && string.IsNullOrWhiteSpace(settings.ApiKey))
-            //     errors.Add("API Key is required for production environment");
-            // 
-            // if (!settings.UseTestnet && string.IsNullOrWhiteSpace(settings.ApiSecret))
-            //     errors.Add("API Secret is required for production environment");
-            // 
-            // if (string.IsNullOrWhiteSpace(settings.Symbols))
-            //     errors.Add("At least one symbol must be specified");
-            
-            return errors;
-        }
-        
-        /// <summary>
-        /// Connects to the exchange WebSocket.
-        /// TODO: Implement based on your exchange's WebSocket API.
-        /// </summary>
-        private async Task ConnectWebSocket()
-        {
-            var settings = Settings as Model.PlugInSettings;
-            var wsUrl = settings?.GetEffectiveWebSocketUrl() ?? "wss://api.example.com/ws";
-            
-            _webSocket = new ClientWebSocket();
-            
-            // TODO: Add authentication headers if needed
-            // Example:
-            // _webSocket.Options.SetRequestHeader("Authorization", $"Bearer {settings.ApiKey}");
-            
-            await _webSocket.ConnectAsync(new Uri(wsUrl), _cancellationTokenSource.Token);
-            
-            // Start the receive loop
-            _receiveTask = Task.Run(ReceiveLoop, _cancellationTokenSource.Token);
-        }
-        
-        /// <summary>
-        /// Disconnects the WebSocket and cleans up resources.
-        /// </summary>
-        private async Task DisconnectWebSocket()
-        {
-            _cancellationTokenSource?.Cancel();
-            
-            if (_webSocket != null)
-            {
-                if (_webSocket.State == WebSocketState.Open)
-                {
-                    await _webSocket.CloseAsync(WebSocketCloseStatus.NormalClosure, "Closing", CancellationToken.None);
-                }
-                _webSocket.Dispose();
-                _webSocket = null;
-            }
-            
-            // Wait for receive task to complete
-            _receiveTask?.Wait(TimeSpan.FromSeconds(5));
-        }
-        
-        /// <summary>
-        /// Main message receive loop.
-        /// TODO: Customize based on your exchange's message format.
-        /// </summary>
-        private async Task ReceiveLoop()
-        {
-            var buffer = new byte[BUFFER_SIZE];
-            
-            while (_webSocket?.State == WebSocketState.Open && !_cancellationTokenSource.Token.IsCancellationRequested)
-            {
-                try
-                {
-                    var result = await _webSocket.ReceiveAsync(new ArraySegment<byte>(buffer), _cancellationTokenSource.Token);
-                    
-                    if (result.MessageType == WebSocketMessageType.Text)
-                    {
-                        var json = Encoding.UTF8.GetString(buffer, 0, result.Count);
-                        await ProcessMessage(json);
-                    }
-                    else if (result.MessageType == WebSocketMessageType.Close)
-                    {
-                        log.Info("WebSocket closed by server");
-                        await HandleDisconnection();
-                        break;
-                    }
-                }
-                catch (WebSocketException ex)
-                {
-                    log.Error("WebSocket error", ex);
-                    await HandleDisconnection();
-                    break;
-                }
-                catch (OperationCanceledException)
-                {
-                    // Normal cancellation
-                    break;
-                }
-                catch (Exception ex)
-                {
-                    log.Error("Error in receive loop", ex);
-                }
-            }
-        }
-        
-        /// <summary>
-        /// Processes a received message.
-        /// TODO: Implement message processing logic.
-        /// </summary>
-        private async Task ProcessMessage(string json)
-        {
-            try
-            {
-                // Parse the message using the JsonParser
-                var parsed = JsonParser.ParseMessage(json, PROVIDER_ID, PROVIDER_NAME);
-                
-                if (parsed != null)
-                {
-                    // Handle different message types
-                    switch (parsed)
-                    {
-                        case OrderBook orderBook:
-                            await ProcessOrderBook(orderBook);
-                            break;
-                        case Trade trade:
-                            await ProcessTrade(trade);
-                            break;
-                        case Model.ErrorMessage errorMessage:
-                            await ProcessError(errorMessage);
-                            break;
-                        case Model.SubscriptionMessage subscription:
-                            await ProcessSubscription(subscription);
-                            break;
-                    }
-                }
-                else
-                {
-                    log.Warn($"Failed to parse message: {json}");
-                }
-            }
-            catch (Exception ex)
-            {
-                log.Error($"Error processing message: {json}", ex);
-            }
-        }
-        
-        /// <summary>
-        /// Processes an order book message.
-        /// TODO: Implement order book processing logic.
-        /// </summary>
-        private async Task ProcessOrderBook(OrderBook orderBook)
-        {
-            // TODO: Validate sequence numbers
-            // Example:
-            // if (!ValidateSequence(orderBook.Symbol, orderBook.Sequence))
-            // {
-            //     log.Warn($"Sequence gap detected for {orderBook.Symbol}");
-            //     await RequestOrderBookSnapshot(orderBook.Symbol);
-            //     return;
-            // }
-            
-            // Publish the order book to VisualHFT
-            RaiseOnDataReceived(orderBook);
-            
-            var settings = Settings as Model.PlugInSettings;
-            if (settings?.EnableDebugLogging == true)
-            {
-                log.Debug($"Published order book for {orderBook.Symbol}");
-            }
-        }
-        
-        /// <summary>
-        /// Processes a trade message.
-        /// TODO: Implement trade processing logic.
-        /// </summary>
-        private async Task ProcessTrade(Trade trade)
-        {
-            // TODO: Check for duplicate trades
-            // Example:
-            // if (IsDuplicateTrade(trade.TradeID))
-            //     return;
-            
-            // Publish the trade to VisualHFT
-            RaiseOnDataReceived(trade);
-            
-            var settings = Settings as Model.PlugInSettings;
-            if (settings?.EnableDebugLogging == true)
-            {
-                log.Debug($"Published trade for {trade.Symbol}: {trade.Price} x {trade.Size}");
-            }
-        }
-        
-        /// <summary>
-        /// Processes an error message.
-        /// TODO: Implement error handling logic.
-        /// </summary>
-        private async Task ProcessError(Model.ErrorMessage errorMessage)
-        {
-            log.Error($"Exchange error: {errorMessage.Code} - {errorMessage.Message}");
-            
-            // TODO: Handle specific error codes
-            // Example:
-            // switch (errorMessage.Code)
-            // {
-            //     case 400:
-            //         // Bad request - check subscription format
-            //         break;
-            //     case 401:
-            //         // Unauthorized - check API credentials
-            //         break;
-            //     case 429:
-            //         // Rate limited - implement backoff
-            //         break;
-            // }
-        }
-        
-        /// <summary>
-        /// Processes a subscription confirmation.
-        /// TODO: Implement subscription handling logic.
-        /// </summary>
-        private async Task ProcessSubscription(Model.SubscriptionMessage subscription)
-        {
-            if (subscription.Status == "success")
-            {
-                log.Info($"Successfully subscribed to {subscription.Channel} for {subscription.Symbol}");
+                InitializeDefaultSettings();
             }
             else
             {
-                log.Error($"Failed to subscribe to {subscription.Channel} for {subscription.Symbol}");
+                _settings = loaded;
+            }
+            if (_settings.Provider == null)
+            {
+                // Back-compat for settings files written before Provider existed.
+                _settings.Provider = new Provider
+                {
+                    ProviderID = 999,
+                    ProviderName = "TemplateExchange"
+                };
+            }
+
+            // Feed the symbol list into VisualHFT's normalization pipeline.
+            // Accepted formats per entry:
+            //   "BTCUSDT"                  → no normalization
+            //   "BTCUSDT(BTC/USD)"         → raw=BTCUSDT, normalized=BTC/USD
+            if (_settings.Symbols != null && _settings.Symbols.Count > 0)
+            {
+                ParseSymbols(string.Join(',', _settings.Symbols));
             }
         }
-        
-        /// <summary>
-        /// Handles disconnection and attempts reconnection.
-        /// TODO: Customize reconnection logic based on your needs.
-        /// </summary>
-        private async Task HandleDisconnection()
+
+        protected override void SaveSettings()
         {
-            var settings = Settings as Model.PlugInSettings;
-            
-            if (settings?.EnableReconnection != true || _reconnectionAttempts >= settings.MaxReconnectionAttempts)
-            {
-                Status = ePluginStatus.STOPPED;
-                log.Info("Disconnected - max reconnection attempts reached");
-                return;
-            }
-            
-            _reconnectionAttempts++;
-            var delay = Math.Min(RECONNECTION_DELAY_MS * (int)Math.Pow(2, _reconnectionAttempts - 1), 30000);
-            
-            log.Info($"Attempting reconnection {_reconnectionAttempts}/{settings.MaxReconnectionAttempts} in {delay}ms...");
-            
-            await Task.Delay(delay);
-            
-            try
-            {
-                await StartAsync();
-                _reconnectionAttempts = 0;
-            }
-            catch
-            {
-                await HandleDisconnection();
-            }
+            SaveToUserSettings(_settings);
         }
-        
-        /// <summary>
-        /// Validates sequence numbers for order book updates.
-        /// TODO: Implement based on your exchange's sequence handling.
-        /// </summary>
-        private bool ValidateSequence(string symbol, long sequence)
+
+        protected override void InitializeDefaultSettings()
         {
-            if (!_lastSequences.ContainsKey(symbol))
+            _settings = new PlugInSettings
             {
-                _lastSequences[symbol] = sequence;
-                return true;
-            }
-            
-            var lastSequence = _lastSequences[symbol];
-            if (sequence <= lastSequence)
-            {
-                log.Warn($"Out of sequence message for {symbol}: {sequence} <= {lastSequence}");
-                return false;
-            }
-            
-            if (sequence > lastSequence + 1)
-            {
-                log.Warn($"Sequence gap detected for {symbol}: {sequence} > {lastSequence + 1}");
-                _lastSequences[symbol] = sequence;
-                return false;
-            }
-            
-            _lastSequences[symbol] = sequence;
-            return true;
+                ApiKey = string.Empty,
+                ApiSecret = string.Empty,
+                DepthLevels = 20,
+                Provider = new Provider
+                {
+                    ProviderID = 999,                  // TODO: pick a unique ID for your exchange
+                    ProviderName = "TemplateExchange"  // TODO: replace with your exchange name
+                },
+                Symbols = new List<string> { "BTCUSDT(BTC/USD)" },
+                AggregationLevel = AggregationLevel.Ms100
+            };
+            SaveToUserSettings(_settings);
         }
-        
-        #endregion
-        
-        #region IDisposable Implementation
-        
+
+        public override object GetUISettings()
+        {
+            var view = new PluginSettingsView();
+            var viewModel = new PluginSettingsViewModel(CloseSettingWindow)
+            {
+                ApiKey = _settings.ApiKey,
+                ApiSecret = _settings.ApiSecret,
+                DepthLevels = _settings.DepthLevels,
+                ProviderId = _settings.Provider.ProviderID,
+                ProviderName = _settings.Provider.ProviderName,
+                Symbols = _settings.Symbols
+            };
+
+            viewModel.UpdateSettingsFromUI = () =>
+            {
+                _settings.ApiKey = viewModel.ApiKey;
+                _settings.ApiSecret = viewModel.ApiSecret;
+                _settings.DepthLevels = viewModel.DepthLevels;
+                _settings.Provider = new Provider
+                {
+                    ProviderID = viewModel.ProviderId,
+                    ProviderName = viewModel.ProviderName
+                };
+                _settings.Symbols = viewModel.Symbols;
+                SaveSettings();
+                ParseSymbols(string.Join(',', _settings.Symbols));
+
+                // Reload connection with the new values.
+                RaiseOnDataReceived(GetProviderModel(eSESSIONSTATUS.CONNECTING));
+                Status = ePluginStatus.STARTING;
+                Task.Run(async () => await HandleConnectionLost(
+                    $"{Name} is restarting after settings change.", null!, true));
+            };
+
+            view.DataContext = viewModel;
+            return view;
+        }
+
         protected override void Dispose(bool disposing)
         {
-            if (!_disposed && disposing)
+            if (_disposed) return;
+            _disposed = true;
+
+            if (disposing)
             {
-                log.Info($"Disposing {PROVIDER_NAME} plugin...");
-                
-                // Stop the plugin if running
-                if (Status == ePluginStatus.STARTED)
-                {
-                    StopAsync().GetAwaiter().GetResult();
-                }
-                
-                // Dispose resources
-                _cancellationTokenSource?.Dispose();
-                _connectionLock?.Dispose();
-                
-                _disposed = true;
+                // TODO: dispose your exchange client(s), timers, queues, etc.
+                base.Dispose();
             }
-            
-            base.Dispose(disposing);
         }
-        
-        #endregion
     }
 }

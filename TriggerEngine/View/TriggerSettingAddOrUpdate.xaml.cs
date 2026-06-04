@@ -34,7 +34,7 @@ namespace VisualHFT.TriggerEngine.View
     {
         TriggerEngineRuleViewModel model = new TriggerEngineRuleViewModel();
         public ConditionOperator ConditionOperator { get; set; }
-        public List<TilesView> PluginNames { get; set; }
+        public ICollectionView PluginNames { get; private set; }
 
         public long selectedID { get; set; }
 
@@ -42,16 +42,19 @@ namespace VisualHFT.TriggerEngine.View
         {
             InitializeComponent();
 
-            var vmDashboard = dashboard;
-            PluginNames = new List<TilesView>();
-            vmDashboard.Tiles.ToList().ForEach(x =>
-            {
-                TilesView vm = new TilesView();
-                vm.TileName = x.Title + Environment.NewLine + x.SelectedProviderName + ": " + x.SelectedSymbol;
-                vm.PluginID = x.PluginID;
-                
-                PluginNames.Add(vm);
-            });
+            // Plugin list now comes from the curated, flattened study-metric catalog
+            // (PluginManager.GetSelectableStudies) instead of the dashboard tiles. It lists
+            // every loaded study — single studies and multi-study children grouped under
+            // their parent — and flags whether each is configured. Grouping + the
+            // IsConfigured flag drive the dropdown's headers and disabled rows in XAML.
+            // The dashboard parameter is retained for call-site compatibility but is no
+            // longer used here.
+            var studies = VisualHFT.PluginManager.PluginManager.GetSelectableStudies().ToList();
+            var view = new ListCollectionView(studies);
+            view.GroupDescriptions.Add(new PropertyGroupDescription(nameof(VisualHFT.PluginManager.StudyDescriptor.GroupName)));
+            view.SortDescriptions.Add(new SortDescription(nameof(VisualHFT.PluginManager.StudyDescriptor.GroupName), ListSortDirection.Ascending));
+            view.SortDescriptions.Add(new SortDescription(nameof(VisualHFT.PluginManager.StudyDescriptor.DisplayName), ListSortDirection.Ascending));
+            PluginNames = view;
 
             if(_rule!=null)
             {

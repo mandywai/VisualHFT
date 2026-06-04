@@ -10,8 +10,8 @@ namespace VisualHFT.TriggerEngine
     {
         public string Name { get; set; }                   // Friendly name for UI
         public List<TriggerCondition> Condition { get; set; } = new List<TriggerCondition>();  // "WHEN"
-        public List<TriggerAction> Actions { get; set; }        // "THEN"
+        public List<TriggerAction> Actions { get; set; } = new List<TriggerAction>();        // "THEN"
         public bool IsEnabled { get; set; } = true;
         public long RuleID { get; set; }
-    } 
+    }
 }

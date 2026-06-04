@@ -118,7 +118,7 @@ namespace MarketConnectors.KuCoin
                     if (!string.IsNullOrEmpty(_settings.ApiKey) && !string.IsNullOrEmpty(_settings.ApiSecret) &&
                         !string.IsNullOrEmpty(_settings.APIPassPhrase))
                     {
-                        options.ApiCredentials = new ApiCredentials(_settings.ApiKey,
+                        options.ApiCredentials = new KucoinCredentials(_settings.ApiKey,
                             _settings.ApiSecret, _settings.APIPassPhrase);
                     }
 
@@ -131,7 +131,7 @@ namespace MarketConnectors.KuCoin
                     if (!string.IsNullOrEmpty(_settings.ApiKey) && !string.IsNullOrEmpty(_settings.ApiSecret) &&
                         !string.IsNullOrEmpty(_settings.APIPassPhrase))
                     {
-                        options.ApiCredentials = new ApiCredentials(_settings.ApiKey,
+                        options.ApiCredentials = new KucoinCredentials(_settings.ApiKey,
                             _settings.ApiSecret, _settings.APIPassPhrase);
                     }
 
