@@ -218,7 +218,9 @@ namespace VisualHFT.Studies.VPINMulti.ViewModel
         {
             return Profiles.Select(x => new VpinProfileSettings
             {
-                Name = x.Name?.Trim() ?? string.Empty,
+                Name = string.IsNullOrWhiteSpace(x.Name)
+                    ? VpinProfileNaming.FormatDisplayName(x.NumberOfBuckets, x.BucketVolumeSize)
+                    : x.Name.Trim(),
                 BucketVolSize = x.BucketVolumeSize,
                 NumberOfBuckets = x.NumberOfBuckets
             }).ToList();
@@ -261,10 +263,11 @@ namespace VisualHFT.Studies.VPINMulti.ViewModel
         {
             var profile = new VpinProfileItem
             {
-                Name = string.IsNullOrWhiteSpace(name) ? $"Profile {_nextProfileNumber++}" : name,
+                Name = string.IsNullOrWhiteSpace(name) ? VpinProfileNaming.FormatDisplayName(numberOfBuckets, bucketVolumeSize) : name,
                 BucketVolumeSize = bucketVolumeSize,
                 NumberOfBuckets = numberOfBuckets
             };
+            _nextProfileNumber++;
             profile.PropertyChanged += Profile_PropertyChanged;
             Profiles.Add(profile);
             RaiseCanExecuteChanged();
@@ -282,17 +285,16 @@ namespace VisualHFT.Studies.VPINMulti.ViewModel
             if (Profiles.Count == 0)
                 return "Add at least one VPIN profile.";
 
-            if (Profiles.Any(x => string.IsNullOrWhiteSpace(x.Name)))
-                return "Each VPIN profile needs a name.";
-
-            if (Profiles.GroupBy(x => x.Name.Trim(), StringComparer.OrdinalIgnoreCase).Any(x => x.Count() > 1))
-                return "VPIN profile names must be unique.";
-
             if (Profiles.Any(x => x.BucketVolumeSize <= 0))
                 return "Each VPIN profile needs a bucket volume size greater than zero.";
 
             if (Profiles.Any(x => x.NumberOfBuckets <= 0))
                 return "Each VPIN profile needs a number of buckets greater than zero.";
+
+            if (Profiles
+                .GroupBy(x => VpinProfileNaming.FormatDisplayName(x.NumberOfBuckets, x.BucketVolumeSize), StringComparer.OrdinalIgnoreCase)
+                .Any(x => x.Count() > 1))
+                return "VPIN profiles must have unique bucket-count and bucket-size combinations.";
 
             return null;
         }

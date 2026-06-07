@@ -26,17 +26,16 @@ namespace VisualHFT.Studies.VPINMulti.Model
             if (missing.Count > 0)
                 return "Missing: " + string.Join(", ", missing) + ".";
 
-            if (Profiles.Any(x => string.IsNullOrWhiteSpace(x.Name)))
-                return "Each VPIN profile needs a name.";
-
-            if (Profiles.GroupBy(x => x.Name.Trim(), System.StringComparer.OrdinalIgnoreCase).Any(x => x.Count() > 1))
-                return "VPIN profile names must be unique.";
-
             if (Profiles.Any(x => x.BucketVolSize <= 0))
                 return "Each VPIN profile needs a bucket volume size greater than zero.";
 
             if (Profiles.Any(x => x.NumberOfBuckets <= 0))
                 return "Each VPIN profile needs a number of buckets greater than zero.";
+
+            if (Profiles
+                .GroupBy(x => VpinProfileNaming.FormatDisplayName(x.NumberOfBuckets, x.BucketVolSize), System.StringComparer.OrdinalIgnoreCase)
+                .Any(x => x.Count() > 1))
+                return "VPIN profiles must have unique bucket-count and bucket-size combinations.";
 
             return null;
         }
@@ -47,5 +46,13 @@ namespace VisualHFT.Studies.VPINMulti.Model
         public string Name { get; set; } = string.Empty;
         public double BucketVolSize { get; set; }
         public int NumberOfBuckets { get; set; }
+    }
+
+    public static class VpinProfileNaming
+    {
+        public static string FormatDisplayName(int numberOfBuckets, double bucketVolumeSize)
+        {
+            return $"VPIN_{numberOfBuckets}_{bucketVolumeSize:0.###}";
+        }
     }
 }

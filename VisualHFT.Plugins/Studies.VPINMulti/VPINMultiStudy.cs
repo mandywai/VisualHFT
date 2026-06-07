@@ -95,7 +95,7 @@ namespace VisualHFT.Studies
                 {
                     new VpinProfileSettings
                     {
-                        Name = "Default",
+                        Name = VpinProfileNaming.FormatDisplayName(DefaultNumberOfBuckets, 1),
                         BucketVolSize = 1,
                         NumberOfBuckets = DefaultNumberOfBuckets
                     }
@@ -148,7 +148,7 @@ namespace VisualHFT.Studies
                 }
 
                 Studies = (_settings.Profiles ?? new List<VpinProfileSettings>())
-                    .Select(x => (IStudy)new VpinProfileStudy(x.Name, x.BucketVolSize, x.NumberOfBuckets))
+                    .Select(x => (IStudy)new VpinProfileStudy(x.BucketVolSize, x.NumberOfBuckets))
                     .ToList();
             }
         }
@@ -213,13 +213,14 @@ namespace VisualHFT.Studies
             public event EventHandler<decimal> OnAlertTriggered;
             public event EventHandler<BaseStudyModel> OnCalculated;
 
-            public VpinProfileStudy(string profileName, double bucketVolumeSize, int numberOfBuckets)
+            public VpinProfileStudy(double bucketVolumeSize, int numberOfBuckets)
             {
-                var safeName = string.IsNullOrWhiteSpace(profileName) ? "Unnamed" : profileName.Trim();
-                TileTitle = $"VPIN {safeName}";
-                TileToolTip = $"VPIN profile {safeName}";
+                var safeNumberOfBuckets = numberOfBuckets > 0 ? numberOfBuckets : DefaultNumberOfBuckets;
+                var displayName = VpinProfileNaming.FormatDisplayName(safeNumberOfBuckets, bucketVolumeSize);
+                TileTitle = displayName;
+                TileToolTip = $"VPIN profile {displayName}";
                 _bucketVolumeSize = (decimal)bucketVolumeSize;
-                _bucketImbalances = new decimal[numberOfBuckets > 0 ? numberOfBuckets : DefaultNumberOfBuckets];
+                _bucketImbalances = new decimal[safeNumberOfBuckets];
                 IsChartButtonVisible = false;
                 IsSettingsButtonVisisble = false;
                 IsFooterVisible = false;
