@@ -55,7 +55,6 @@ namespace VisualHFT.Studies
         public override string TileTitle { get; set; } = "Data Recorder";
         public override string TileToolTip { get; set; } = "Persists selected market and study outputs into streaming JSONL files with a session metadata file at completion.";
         public override bool EmitsMetric => false;
-        public override bool AutoStart => false;
 
 
         public DataRecorderStudy()
