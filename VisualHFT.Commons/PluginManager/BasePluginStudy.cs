@@ -44,6 +44,7 @@ namespace VisualHFT.Commons.PluginManager
         // Declarative capability: emitting studies override this to true (see IStudy.EmitsMetric).
         // Default false so non-emitting studies are excluded from the trigger-rule study picker.
         public virtual bool EmitsMetric => false;
+        public virtual bool AutoStart => true;
 
         public ePluginType PluginType
         {

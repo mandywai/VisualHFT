@@ -55,6 +55,7 @@ namespace VisualHFT.Studies
         public override string TileTitle { get; set; } = "Data Recorder";
         public override string TileToolTip { get; set; } = "Persists selected market and study outputs into streaming JSONL files with a session metadata file at completion.";
         public override bool EmitsMetric => false;
+        public override bool AutoStart => false;
 
 
         public DataRecorderStudy()
@@ -164,7 +165,7 @@ namespace VisualHFT.Studies
                 AggregationLevel = AggregationLevel.S1,
                 CaptureMode = CaptureMode.OnUpdate,
                 RunIndefinitely = true,
-                DurationSeconds = 0,
+                DurationMinutes = 0,
                 SelectedMarketFields = new List<string> { "best_bid_price", "best_ask_price", "mid_price", "spread" },
                 SelectedStudyIds = new List<string>()
             };
@@ -184,7 +185,7 @@ namespace VisualHFT.Studies
                 _settings.CaptureMode = viewModel.CaptureModeSelection;
                 _settings.OutputFolder = viewModel.OutputFolder;
                 _settings.RunIndefinitely = viewModel.RunIndefinitely;
-                _settings.DurationSeconds = viewModel.DurationSeconds;
+                _settings.DurationMinutes = viewModel.DurationMinutes;
                 _settings.SelectedMarketFields = viewModel.MarketFieldOptions.Where(x => x.IsSelected).Select(x => x.Id).ToList();
                 _settings.SelectedStudyIds = viewModel.StudyOptions.Where(x => x.IsSelected).Select(x => x.Id).ToList();
 
@@ -280,7 +281,7 @@ namespace VisualHFT.Studies
 
         private void StartDurationStopIfNeeded()
         {
-            if (_settings.RunIndefinitely || _settings.DurationSeconds <= 0)
+            if (_settings.RunIndefinitely || _settings.DurationMinutes <= 0)
                 return;
 
             _durationCts = new CancellationTokenSource();
@@ -289,7 +290,7 @@ namespace VisualHFT.Studies
             {
                 try
                 {
-                    await Task.Delay(TimeSpan.FromSeconds(_settings.DurationSeconds), token);
+                    await Task.Delay(TimeSpan.FromMinutes(_settings.DurationMinutes), token);
                     if (!token.IsCancellationRequested)
                         await StopAsync();
                 }
@@ -502,7 +503,7 @@ namespace VisualHFT.Studies
                 symbol = _settings.Symbol,
                 capture_mode = _settings.CaptureMode.ToString(),
                 fixed_interval = _settings.CaptureMode == CaptureMode.FixedInterval ? _settings.AggregationLevel.ToString() : null,
-                duration_seconds = _settings.RunIndefinitely ? (int?)null : _settings.DurationSeconds,
+                duration_minutes = _settings.RunIndefinitely ? (int?)null : _settings.DurationMinutes,
                 output_folder = _sessionFolder,
                 data_file = _dataFilePath,
                 record_count = Interlocked.Read(ref _writtenRecords),

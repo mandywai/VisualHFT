@@ -48,7 +48,7 @@ namespace VisualHFT.Studies.DataRecorder.ViewModel
         private RecorderCaptureMode _captureMode;
         private string _outputFolder = string.Empty;
         private bool _runIndefinitely = true;
-        private int _durationSeconds;
+        private int _durationMinutes;
         private string _validationMessage;
         private readonly Action _actionCloseWindow;
 
@@ -78,8 +78,8 @@ namespace VisualHFT.Studies.DataRecorder.ViewModel
 
             CaptureModes = new ObservableCollection<Tuple<string, RecorderCaptureMode>>
             {
-                new Tuple<string, RecorderCaptureMode>("Whenever data changes", RecorderCaptureMode.OnUpdate),
-                new Tuple<string, RecorderCaptureMode>("Fixed interval snapshots", RecorderCaptureMode.FixedInterval)
+                new Tuple<string, RecorderCaptureMode>("Event driven", RecorderCaptureMode.OnUpdate),
+                new Tuple<string, RecorderCaptureMode>("Time driven", RecorderCaptureMode.FixedInterval)
             };
 
             MarketFieldOptions = new ObservableCollection<SelectableItem>(DataRecorderStudy.GetMarketFieldDefinitions().Select(x => new SelectableItem
@@ -209,13 +209,13 @@ namespace VisualHFT.Studies.DataRecorder.ViewModel
 
         public bool IsDurationEnabled => !RunIndefinitely;
 
-        public int DurationSeconds
+        public int DurationMinutes
         {
-            get => _durationSeconds;
+            get => _durationMinutes;
             set
             {
-                _durationSeconds = value;
-                OnPropertyChanged(nameof(DurationSeconds));
+                _durationMinutes = value;
+                OnPropertyChanged(nameof(DurationMinutes));
                 RaiseCanExecuteChanged();
             }
         }
@@ -250,8 +250,8 @@ namespace VisualHFT.Studies.DataRecorder.ViewModel
                         if (string.IsNullOrWhiteSpace(OutputFolder))
                             return "Select an output folder.";
                         break;
-                    case nameof(DurationSeconds):
-                        if (!RunIndefinitely && DurationSeconds <= 0)
+                    case nameof(DurationMinutes):
+                        if (!RunIndefinitely && DurationMinutes <= 0)
                             return "Duration must be greater than zero.";
                         break;
                     case nameof(AggregationLevelSelection):
@@ -277,7 +277,7 @@ namespace VisualHFT.Studies.DataRecorder.ViewModel
             CaptureModeSelection = settings.CaptureMode;
             OutputFolder = settings.OutputFolder;
             RunIndefinitely = settings.RunIndefinitely;
-            DurationSeconds = settings.DurationSeconds;
+            DurationMinutes = settings.DurationMinutes;
             var selectedFields = new HashSet<string>(settings.SelectedMarketFields ?? new List<string>());
             foreach (var item in MarketFieldOptions)
                 item.IsSelected = selectedFields.Contains(item.Id);
@@ -314,7 +314,7 @@ namespace VisualHFT.Studies.DataRecorder.ViewModel
             return string.IsNullOrWhiteSpace(this[nameof(SelectedProvider)]) &&
                    string.IsNullOrWhiteSpace(this[nameof(SelectedSymbol)]) &&
                    string.IsNullOrWhiteSpace(this[nameof(OutputFolder)]) &&
-                   string.IsNullOrWhiteSpace(this[nameof(DurationSeconds)]) &&
+                   string.IsNullOrWhiteSpace(this[nameof(DurationMinutes)]) &&
                    string.IsNullOrWhiteSpace(this[nameof(AggregationLevelSelection)]);
         }
 

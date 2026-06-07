@@ -43,6 +43,7 @@ namespace VisualHFT.Commons.PluginManager
             get { return ePluginType.MARKET_CONNECTOR; }
         }
         public virtual eLicenseLevel RequiredLicenseLevel => eLicenseLevel.COMMUNITY; // Default to Community, override in derived classes if needed
+        public virtual bool AutoStart => true;
 
         protected abstract void LoadSettings();
         protected abstract void SaveSettings();

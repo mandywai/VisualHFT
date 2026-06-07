@@ -121,6 +121,9 @@ namespace VisualHFT.PluginManager
                 if (ALL_PLUGINS.Count == 0) { return; }
                 foreach (var plugin in ALL_PLUGINS)
                 {
+                    if (!plugin.AutoStart)
+                        continue;
+
                     // Add a task for starting each plugin and handle exceptions within the task
                     startTasks.Add(Task.Run(() =>
                     {

@@ -1,3 +1,5 @@
+using Newtonsoft.Json;
+using System;
 using VisualHFT.Enums;
 using VisualHFT.Model;
 using VisualHFT.UserSettings;
@@ -19,9 +21,20 @@ namespace VisualHFT.Studies.DataRecorder.Model
         public CaptureMode CaptureMode { get; set; } = CaptureMode.OnUpdate;
         public string OutputFolder { get; set; } = string.Empty;
         public bool RunIndefinitely { get; set; } = true;
-        public int DurationSeconds { get; set; } = 0;
+        public int DurationMinutes { get; set; } = 0;
         public List<string> SelectedMarketFields { get; set; } = new List<string>();
         public List<string> SelectedStudyIds { get; set; } = new List<string>();
+
+        // Backward compatibility for previously persisted recorder settings.
+        [JsonProperty("DurationSeconds")]
+        private int LegacyDurationSeconds
+        {
+            set
+            {
+                if (DurationMinutes <= 0 && value > 0)
+                    DurationMinutes = (int)Math.Ceiling(value / 60d);
+            }
+        }
 
         public string? GetConfigurationError()
         {
@@ -37,7 +50,7 @@ namespace VisualHFT.Studies.DataRecorder.Model
                 missing.Add("at least one market field or study metric");
             if (CaptureMode == CaptureMode.FixedInterval && AggregationLevel == AggregationLevel.None)
                 missing.Add("fixed interval");
-            if (!RunIndefinitely && DurationSeconds <= 0)
+            if (!RunIndefinitely && DurationMinutes <= 0)
                 missing.Add("positive duration");
 
             return missing.Count == 0 ? null : "Missing: " + string.Join(", ", missing) + ".";
