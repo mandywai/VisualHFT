@@ -1,4 +1,4 @@
-﻿<Project Sdk="Microsoft.NET.Sdk">
+<Project Sdk="Microsoft.NET.Sdk">
 
   <PropertyGroup>
 	  <OutputType>WinExe</OutputType>
@@ -125,6 +125,7 @@
     <ProjectReference Include="VisualHFT.Plugins\MarketConnectors.Gemini\MarketConnectors.Gemini\MarketConnectors.Gemini.csproj" />
     <ProjectReference Include="VisualHFT.Plugins\MarketConnectors.Kraken\MarketConnectors.Kraken.csproj" />
     <ProjectReference Include="VisualHFT.Plugins\MarketConnectors.KuCoin\MarketConnectors.KuCoin.csproj" />
+    <ProjectReference Include="VisualHFT.Plugins\Studies.DataRecorder\Studies.DataRecorder.csproj" />
     <ProjectReference Include="VisualHFT.Plugins\Studies.LOBImbalance\Studies.LOBImbalance.csproj" />
     <ProjectReference Include="VisualHFT.Plugins\Studies.MarketResilience\Studies.MarketResilience.csproj" />
     <ProjectReference Include="VisualHFT.Plugins\Studies.OTT_Ratio\Studies.OTT_Ratio.csproj" />
@@ -221,3 +222,4 @@
 	</ItemGroup>
 
 </Project>
+
