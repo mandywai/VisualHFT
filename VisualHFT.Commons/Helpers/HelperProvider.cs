@@ -38,6 +38,18 @@ namespace VisualHFT.Helpers
         }
         private void _timer_check_heartbeat_Elapsed(object sender, System.Timers.ElapsedEventArgs e)
         {
+            CheckHeartbeats();
+        }
+
+        /// <summary>
+        /// Runs the staleness check over all tracked providers: any provider whose last update is
+        /// older than the heartbeat window (compared on HelperTimeProvider.Now, so it stays correct
+        /// under replay) is marked CONNECTED_WITH_WARNINGS, its display cleared via empty order books,
+        /// and OnProviderStale raised. Public so a deterministic test can drive it by advancing the
+        /// virtual clock instead of waiting for the wall-clock 30s timer.
+        /// </summary>
+        public void CheckHeartbeats()
+        {
             foreach (var x in this)
             {
                 // Skip if already fully disconnected

@@ -812,6 +812,19 @@ namespace MarketConnectors.Bitfinex
 
 
         //FOR UNIT TESTING PURPOSES
+        // FOR UNIT TESTING PURPOSES: simulate a connection interruption + recovery, fully offline.
+        // Drives the REAL reconnect teardown (ClearAsync) then reseeds from the snapshot via the
+        // existing InjectSnapshot path — the same teardown+reseed pair a live reconnect runs — so a
+        // test can assert the reconnect leaves a FRESH book, not a stale one (see ReconnectionReseedTests).
+        public async Task SimulateConnectionInterruption(VisualHFT.Model.OrderBook reseedSnapshot)
+        {
+            if (reseedSnapshot == null)
+                throw new ArgumentNullException(nameof(reseedSnapshot));
+
+            await ClearAsync();
+            InjectSnapshot(reseedSnapshot, reseedSnapshot.Sequence);
+            Status = ePluginStatus.STARTED;
+        }
         public void InjectSnapshot(VisualHFT.Model.OrderBook snapshotModel, long sequence)
         {
             var localModel = new BitfinexOrderBook();

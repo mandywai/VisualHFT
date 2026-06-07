@@ -447,15 +447,8 @@ namespace MarketConnectors.KuCoin
                                 }
                                 else
                                 {
-                                    if (Math.Abs(DateTime.Now.Subtract(data.ReceiveTime.ToLocalTime()).TotalSeconds) > 1)
-                                    {
-                                        var _msg =
-                                            $"Rates are coming late at {Math.Abs(DateTime.Now.Subtract(data.ReceiveTime.ToLocalTime()).TotalSeconds)} seconds.";
-                                        log.Warn(_msg);
-                                        HelperNotificationManager.Instance.AddNotification(this.Name, _msg,
-                                            HelprNorificationManagerTypes.WARNING,
-                                            HelprNorificationManagerCategories.PLUGINS);
-                                    }
+                                    // Per-frame freshness guard (shared + virtual-clock — see BasePluginDataRetriever).
+                                    CheckFrameFreshnessAndWarn(data.ReceiveTime.ToLocalTime());
                                     HelperCustomQueue<Tuple<DateTime, string, KucoinStreamOrderBook>> buffer;
                                     lock (_buffersLock) // ✅ Protect access
                                     {
@@ -1154,6 +1147,20 @@ namespace MarketConnectors.KuCoin
 
 
 
+        // FOR UNIT TESTING PURPOSES: simulate a connection interruption + recovery, fully offline.
+        // Drives the REAL reconnect teardown (ClearAsync; note KuCoin deliberately PRESERVES
+        // _localOrderBooks across a reconnect, so the reseed below OVERWRITES it) then reseeds via the
+        // existing InjectSnapshot path — the same teardown+reseed pair a live reconnect runs — so a
+        // test can assert the reconnect leaves a FRESH book, not a stale one (see ReconnectionReseedTests).
+        public async Task SimulateConnectionInterruption(VisualHFT.Model.OrderBook reseedSnapshot)
+        {
+            if (reseedSnapshot == null)
+                throw new ArgumentNullException(nameof(reseedSnapshot));
+
+            await ClearAsync();
+            InjectSnapshot(reseedSnapshot, reseedSnapshot.Sequence);
+            Status = ePluginStatus.STARTED;
+        }
 
         //FOR UNIT TESTING PURPOSES
         public void InjectSnapshot(VisualHFT.Model.OrderBook snapshotModel, long sequence)
