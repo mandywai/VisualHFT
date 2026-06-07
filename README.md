@@ -26,6 +26,7 @@ Learn more about **VisualHFT**'s architecture [here](https://visualhft.github.io
 - **Real‑time market data via plug‑ins**: **VisualHFT** retrieves market data through plug‑ins. The open‑source edition ships with plug‑ins for several cryptocurrency venues: **Binance, Bitfinex, BitStamp, Coinbase, Gemini, Kraken, KuCoin** and a generic WebSocket connector. Each plug‑in normalises order‑book and trade updates and pushes them into the common data bus.
 - **Real‑time market microstructure visualisation**: View the full depth of the order book (10+ levels per side), recent trades and order flow dynamics in real time. The WPF UI uses high‑performance charts to display depth, spreads and other microstructure patterns.
 - **Advanced microstructure studies**: Built‑in study plug‑ins compute microstructure analytics like **VPIN** (Volume‑synchronised Probability of Informed Trading), **LOB Imbalance**, **Market Resilience** and **OTT Ratio**. Each study listens to order book/trade events and publishes computed metrics via the trigger engine.
+- **Structured market-data recording**: The **Data Recorder** study plug‑in can persist selected market fields and study outputs to local `jsonl` files for offline analysis, research pipelines or model training.
 - **Trigger engine & alerts**: A rules‑based trigger engine registers metrics from study plug‑ins and evaluates user‑defined conditions (e.g., “VPIN > threshold”). Alerts can be surfaced through the UI or used by custom plug‑ins.
 - **Modular plug‑in architecture**: All connectors and studies implement an `IPlugin` interface and are loaded at runtime by the `PluginManager`. New data sources or analytics can be added by developing a DLL that implements the appropriate base class and dropping it in the plug‑ins folder.
 
@@ -49,6 +50,40 @@ Learn more about **VisualHFT**'s architecture [here](https://visualhft.github.io
 - **Extensibility**: Developers can build their own plug‑ins for proprietary data feeds or custom analytics. See the `VisualHFT.Plugins` folder for examples of data‑retriever and study plug‑ins.
 
 Even though some of these items do not yet appear in the open‑source code, they are part of the project’s roadmap and will be added as development continues.
+
+## Data Recorder Plugin
+
+The **Data Recorder** plug‑in is a built‑in study that stores live market data and selected study metrics to disk for later analysis.
+
+### What it records
+- Selected market fields such as best bid/ask, sizes, mid price, spread, imbalance, sequence and optional depth levels.
+- Selected study outputs emitted by other VisualHFT studies, for example **LOB Imbalance** or any VPIN profile that appears in the study picker.
+
+### Capture modes
+- **Event driven**: write a row whenever the selected market stream or selected study updates.
+- **Time driven**: write one snapshot row on a fixed interval using the latest known market and study values.
+
+### Output format
+- Each session writes to its own output folder with:
+  - `data.jsonl`: flat row-based records
+  - `metadata.json`: session metadata and configuration
+- JSONL rows are intentionally flat and data-oriented, for example:
+  - `row_timestamp_utc`
+  - `market_best_bid_price`
+  - `market_mid_price`
+  - `study_lob_imbalance`
+
+### Settings
+- Choose provider/exchange and symbol.
+- Choose output folder.
+- Choose capture mode: **Event driven** or **Time driven**.
+- Choose fixed interval when using **Time driven** mode.
+- Choose whether the recorder runs indefinitely or for a fixed duration in minutes.
+- Choose which market fields and study metrics to persist.
+
+### Metadata
+- `metadata.json` is written at start and updated again when recording stops.
+- It includes the session start/end time, provider, symbol, capture mode, interval, selected fields, selected studies, output location and record count.
 
 
 ## About the founder
