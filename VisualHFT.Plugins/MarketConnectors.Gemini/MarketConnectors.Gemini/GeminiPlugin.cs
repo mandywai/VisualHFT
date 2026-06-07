@@ -914,6 +914,21 @@ namespace MarketConnectors.Gemini
             }
         }
 
+        // FOR UNIT TESTING PURPOSES: simulate a connection interruption + recovery, fully offline.
+        // Drives the REAL reconnect teardown (ClearAsync) then reseeds via the existing InjectSnapshot
+        // path. InjectSnapshot rebuilds the book directly (it does not use the _eventBuffers queue that
+        // ClearAsync disposes — MarketDataTests proves InjectSnapshot works with no buffers), so no
+        // buffer recreation is needed here. Lets a test assert the reconnect leaves a FRESH book, not a
+        // stale one (see ReconnectionReseedTests).
+        public async Task SimulateConnectionInterruption(VisualHFT.Model.OrderBook reseedSnapshot)
+        {
+            if (reseedSnapshot == null)
+                throw new ArgumentNullException(nameof(reseedSnapshot));
+
+            await ClearAsync();
+            InjectSnapshot(reseedSnapshot, reseedSnapshot.Sequence);
+            Status = ePluginStatus.STARTED;
+        }
         public void InjectSnapshot(OrderBook snapshotModel, long sequence)
         {
             //1. Call snapshot: creates the local order book, but it won't add any item to it

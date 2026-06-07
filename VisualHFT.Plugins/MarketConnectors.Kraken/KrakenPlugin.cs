@@ -404,12 +404,7 @@ namespace MarketConnectors.Kraken
                             {
                                 if (data.UpdateType == SocketUpdateType.Update)
                                 {
-                                    if (Math.Abs(DateTime.Now.Subtract(data.ReceiveTime.ToLocalTime()).TotalSeconds) > 1)
-                                    {
-                                        var _msg = $"Rates are coming late at {Math.Abs(DateTime.Now.Subtract(data.ReceiveTime.ToLocalTime()).TotalSeconds)} seconds.";
-                                        log.Warn(_msg);
-                                        HelperNotificationManager.Instance.AddNotification(this.Name, _msg, HelprNorificationManagerTypes.WARNING, HelprNorificationManagerCategories.PLUGINS);
-                                    }
+                                    CheckFrameFreshnessAndWarn(data.ReceiveTime.ToLocalTime());
 
                                     // ✅ FIX: Thread-safe buffer access
                                     HelperCustomQueue<Tuple<DateTime, string, KrakenBookUpdate>> buffer;
@@ -969,6 +964,21 @@ namespace MarketConnectors.Kraken
             return view;
         }
 
+
+        // FOR UNIT TESTING PURPOSES: simulate a connection interruption + recovery, fully offline.
+        // Drives the REAL reconnect teardown (ClearAsync, which clears _localOrderBooks) then reseeds
+        // via InjectSnapshot. Order MUST be Clear-then-Inject (Clear disposes books) — the same
+        // teardown+reseed pair a live reconnect runs — so a test can assert the reconnect leaves a
+        // FRESH book, not a stale one (see ReconnectionReseedTests).
+        public async Task SimulateConnectionInterruption(VisualHFT.Model.OrderBook reseedSnapshot)
+        {
+            if (reseedSnapshot == null)
+                throw new ArgumentNullException(nameof(reseedSnapshot));
+
+            await ClearAsync();
+            InjectSnapshot(reseedSnapshot, reseedSnapshot.Sequence);
+            Status = ePluginStatus.STARTED;
+        }
 
         //FOR UNIT TESTING PURPOSES
         public void InjectSnapshot(VisualHFT.Model.OrderBook snapshotModel, long sequence)

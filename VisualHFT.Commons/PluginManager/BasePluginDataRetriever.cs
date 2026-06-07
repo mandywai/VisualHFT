@@ -212,6 +212,17 @@ namespace VisualHFT.Commons.PluginManager
         }
 
         /// <summary>
+        /// The reconnection retry loop's exponential backoff. Production uses a real wall-clock delay;
+        /// this is a seam so a test can override it (return a completed task) to exercise the retry/cap/
+        /// backoff orchestration deterministically without waiting 2-32s per attempt. Behavior is
+        /// unchanged in production.
+        /// </summary>
+        protected virtual Task ReconnectBackoffDelayAsync(int milliseconds)
+        {
+            return Task.Delay(milliseconds);
+        }
+
+        /// <summary>
         /// Handles connection loss with automatic reconnection logic.
         /// Thread-safe: Can be called from multiple threads simultaneously.
         /// Idempotent: Multiple calls are coalesced into a single reconnection attempt.
@@ -392,6 +403,28 @@ namespace VisualHFT.Commons.PluginManager
                     HelprNorificationManagerTypes.ERROR, HelprNorificationManagerCategories.PLUGINS, exception);
             }
         }
+
+        /// <summary>
+        /// Per-frame freshness guard: if a received frame's exchange timestamp is more than
+        /// <paramref name="toleranceSeconds"/> behind the (virtual) clock, raise a WARNING notification.
+        /// Reads HelperTimeProvider.Now so it is deterministic under test and correct under replay (per
+        /// the replay-clock rule), and shared so every connector's hot-path freshness check is identical.
+        /// Returns true when a warning was raised.
+        /// </summary>
+        protected bool CheckFrameFreshnessAndWarn(DateTime frameTimeLocal, double toleranceSeconds = 1.0)
+        {
+            double lateBySeconds = Math.Abs(HelperTimeProvider.Now.Subtract(frameTimeLocal).TotalSeconds);
+            if (lateBySeconds > toleranceSeconds)
+            {
+                var _msg = $"Rates are coming late at {lateBySeconds} seconds.";
+                log.Warn(_msg);
+                HelperNotificationManager.Instance.AddNotification(this.Name, _msg,
+                    HelprNorificationManagerTypes.WARNING, HelprNorificationManagerCategories.PLUGINS);
+                return true;
+            }
+            return false;
+        }
+
         private void HandleMaxReconnectionAttempts()
         {
             RaiseOnDataReceived(GetProviderModel(eSESSIONSTATUS.DISCONNECTED_FAILED));
