@@ -360,7 +360,36 @@ namespace VisualHFT.ViewModels
         private void OpenSettings(object obj)
         {
             PluginManager.PluginManager.SettingPlugin(_plugin);
+            RefreshBoundStudies();
             Clear();
+        }
+        private void RefreshBoundStudies()
+        {
+            lock (_LOCK)
+            {
+                foreach (var study in _studies)
+                {
+                    study.OnCalculated -= _study_OnCalculated;
+                }
+                _studies.Clear();
+
+                if (_plugin is IMultiStudy multiStudy)
+                {
+                    foreach (var study in multiStudy.Studies)
+                    {
+                        _studies.Add(study);
+                    }
+                }
+                else if (_plugin is IStudy study)
+                {
+                    _studies.Add(study);
+                }
+
+                foreach (var study in _studies)
+                {
+                    study.OnCalculated += _study_OnCalculated;
+                }
+            }
         }
         private void InitializeData()
         {

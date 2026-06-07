@@ -130,6 +130,7 @@
     <ProjectReference Include="VisualHFT.Plugins\Studies.MarketResilience\Studies.MarketResilience.csproj" />
     <ProjectReference Include="VisualHFT.Plugins\Studies.OTT_Ratio\Studies.OTT_Ratio.csproj" />
     <ProjectReference Include="VisualHFT.Plugins\Studies.VPIN\Studies.VPIN.csproj" />
+    <ProjectReference Include="VisualHFT.Plugins\Studies.VPINMulti\Studies.VPINMulti.csproj" />
   </ItemGroup>
 
   <ItemGroup>
